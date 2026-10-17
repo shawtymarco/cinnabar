@@ -17,7 +17,22 @@ permissions:
   actions: read
 
 jobs:
+  wait:
+    if: github.event.repository.fork
+    runs-on: ubuntu-24.04
+    timeout-minutes: 140
+    permissions:
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RECOVERY_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - name: Wait for the original build without holding its publication lock
+        run: |
+          [[ "$RECOVERY_RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
+          gh run watch "$RECOVERY_RUN_ID" --repo "$GITHUB_REPOSITORY" --interval 60
   publish:
+    needs: wait
     if: github.event.repository.fork
     concurrency:
       group: fork-release-${{ inputs.source_commit }}

@@ -232,6 +232,12 @@ def recover():
     verify_recovery_run(run, jobs, check_sha(os.environ["RELEASE_COMMIT"]), manifest)
 
 
+def find_release(repository, tag):
+    """Find authenticated drafts as well as public releases without the published-tag endpoint."""
+    pages = api(f"repos/{repository}/releases?per_page=100", "--paginate", "--slurp")
+    return next((release for page in pages for release in page if release["tag_name"] == tag), None)
+
+
 def publish():
     """Publish an immutable prerelease only after every selected build succeeds."""
     repository = os.environ["GITHUB_REPOSITORY"]
@@ -244,9 +250,7 @@ def publish():
         verify_symbols(directory, manifest, version, commit)
     digests = checksums(directory, manifest, version, symbols)
     tag = CONFIG["release_prefix"] + commit
-    # Drafts are visible only to writers, so enumerate them using authenticated REST.
-    pages = api(f"repos/{repository}/releases?per_page=100", "--paginate", "--slurp")
-    existing = next((release for page in pages for release in page if release["tag_name"] == tag), None)
+    existing = find_release(repository, tag)
     if existing and not existing["draft"]:
         # Rebuilding can change signatures and timestamps; published downloads are immutable.
         summary(f"Desktop release already published: {existing['html_url']}")
@@ -265,7 +269,9 @@ def publish():
                     "--notes-file", str(notes))
         command("gh", "release", "upload", tag, "--repo", repository, "--clobber",
                 *(str(directory / name) for name in digests))
-    release = api(f"repos/{repository}/releases/tags/{tag}")
+    release = find_release(repository, tag)
+    if release is None:
+        raise RuntimeError("Uploaded draft release is not visible to this token")
     verify_upload(release, digests)
     command("gh", "release", "edit", tag, "--repo", repository, "--draft=false", "--prerelease",
             "--latest=false")

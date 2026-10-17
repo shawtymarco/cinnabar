@@ -249,7 +249,8 @@ class PublicationTests(unittest.TestCase):
 
     def test_bad_upload_never_makes_a_draft_public(self):
         with self.publish_environment(), patch.object(BUILD, "command", return_value="true") as commands, \
-                patch.object(BUILD, "api", side_effect=[[], {"assets": []}]):
+                patch.object(BUILD, "api", side_effect=[[], [[{
+                    "tag_name": BUILD.CONFIG["release_prefix"] + COMMIT, "assets": []}]]]):
             with self.assertRaises(RuntimeError):
                 BUILD.publish()
         self.assertFalse(any("--draft=false" in call.args for call in commands.call_args_list))
@@ -261,6 +262,21 @@ class PublicationTests(unittest.TestCase):
                 patch.object(BUILD, "api", return_value=[[release]]):
             BUILD.publish()
         self.assertFalse(any(call.args[0] == "gh" for call in commands.call_args_list))
+
+    def test_draft_can_be_published_when_tag_endpoint_returns_not_found(self):
+        draft = {"tag_name": BUILD.CONFIG["release_prefix"] + COMMIT, "draft": True,
+                 "assets": [{"name": "payload", "digest": "sha256:abc"}]}
+
+        def draft_api(path, *args):
+            if "/releases/tags/" in path:
+                raise RuntimeError("HTTP 404: draft is unavailable by tag")
+            return [[draft]]
+
+        with self.publish_environment(), patch.object(BUILD, "command", return_value="true") as commands, \
+                patch.object(BUILD, "checksums", return_value={"payload": "abc"}), \
+                patch.object(BUILD, "api", side_effect=draft_api):
+            BUILD.publish()
+        self.assertTrue(any("--draft=false" in call.args for call in commands.call_args_list))
 
 
 if __name__ == "__main__":

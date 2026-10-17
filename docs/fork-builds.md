@@ -52,7 +52,8 @@ unsigned and macOS is ad-hoc signed and unnotarized.
 
 Completed CI artifacts can also be published without rebuilding. Dispatch
 **Publish completed desktop build** on `fork-ci`, with the Package `run_id` and
-its full `source_commit`. It verifies that all three desktop jobs succeeded,
+its full `source_commit`. If the original run is still active, recovery waits
+without holding the publication lock. It verifies that all three desktop jobs succeeded,
 downloads only their installers and symbols, and reads the version from that
 source commit. The symbol archives must identify the requested revision. The
 publication checks and draft-to-public transition are identical to automatic
