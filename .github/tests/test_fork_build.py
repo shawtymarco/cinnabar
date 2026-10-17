@@ -147,6 +147,9 @@ class MergeTests(unittest.TestCase):
 
 class PublicationTests(unittest.TestCase):
     def setUp(self):
+        self.latest = patch.object(BUILD, "latest_release", return_value=None)
+        self.latest.start()
+        self.addCleanup(self.latest.stop)
         self.manifest = json.loads((ROOT / "packaging/release-assets.json").read_text())
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -236,11 +239,22 @@ class PublicationTests(unittest.TestCase):
 
     def test_published_release_is_not_overwritten_by_a_different_rebuild(self):
         release = {"tag_name": BUILD.CONFIG["release_prefix"] + COMMIT, "draft": False,
-                   "assets": [], "html_url": "https://example.invalid/release"}
+                   "assets": [{"name": name} for name in self.names | {self.manifest["checksums"]}],
+                   "html_url": "https://example.invalid/release"}
         with self.publish_environment(), patch.object(BUILD, "command", return_value="true") as commands, \
                 patch.object(BUILD, "api", return_value=[[release]]):
             BUILD.publish()
-        self.assertFalse(any(call.args[0] == "gh" for call in commands.call_args_list))
+        self.assertFalse(any(call.args[:3] == ("gh", "release", "upload")
+                             for call in commands.call_args_list))
+        self.assertTrue(any("--latest=true" in call.args for call in commands.call_args_list))
+
+    def test_incomplete_published_release_is_not_promoted(self):
+        release = {"tag_name": BUILD.CONFIG["release_prefix"] + COMMIT, "draft": False, "assets": []}
+        with self.publish_environment(), patch.object(BUILD, "command", return_value="true") as commands, \
+                patch.object(BUILD, "api", return_value=[[release]]):
+            with self.assertRaises(RuntimeError):
+                BUILD.publish()
+        self.assertFalse(any("--latest=true" in call.args for call in commands.call_args_list))
 
     def test_draft_can_be_published_when_tag_endpoint_returns_not_found(self):
         draft = {"tag_name": BUILD.CONFIG["release_prefix"] + COMMIT, "draft": True,
@@ -256,6 +270,38 @@ class PublicationTests(unittest.TestCase):
                 patch.object(BUILD, "api", side_effect=draft_api):
             BUILD.publish()
         self.assertTrue(any("--draft=false" in call.args for call in commands.call_args_list))
+
+
+class LatestReleaseTests(unittest.TestCase):
+    def test_first_success_becomes_latest(self):
+        with patch.object(BUILD, "latest_release", return_value=None), \
+                patch.object(BUILD, "command") as command:
+            self.assertTrue(BUILD.promote_release("owner/fork", "new", COMMIT, "1.2.3"))
+        self.assertIn("--latest=true", command.call_args.args)
+        self.assertIn("--prerelease=false", command.call_args.args)
+
+    def test_older_recovery_cannot_replace_newer_latest(self):
+        for status in ("behind", "diverged"):
+            with self.subTest(status=status), \
+                    patch.object(BUILD, "latest_release", return_value={"tag_name": "newer"}), \
+                    patch.object(BUILD, "api", return_value={"status": status}), \
+                    patch.object(BUILD, "command") as command:
+                self.assertFalse(BUILD.promote_release("owner/fork", "older", COMMIT, "1.2.3"))
+                self.assertIn("--latest=false", command.call_args.args)
+
+    def test_successful_descendant_replaces_latest(self):
+        with patch.object(BUILD, "latest_release", return_value={"tag_name": "older"}), \
+                patch.object(BUILD, "api", return_value={"status": "ahead"}), \
+                patch.object(BUILD, "command") as command:
+            self.assertTrue(BUILD.promote_release("owner/fork", "newer", COMMIT, "1.2.3"))
+        self.assertIn("--latest=true", command.call_args.args)
+
+    def test_api_error_is_not_treated_as_missing_latest(self):
+        with patch.object(BUILD, "api", side_effect=RuntimeError("Forbidden (HTTP 403)")):
+            with self.assertRaises(RuntimeError):
+                BUILD.latest_release("owner/fork")
+        with patch.object(BUILD, "api", side_effect=RuntimeError("Not Found (HTTP 404)")):
+            self.assertIsNone(BUILD.latest_release("owner/fork"))
 
 
 if __name__ == "__main__":

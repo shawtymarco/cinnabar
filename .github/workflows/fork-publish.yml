@@ -35,7 +35,7 @@ jobs:
     needs: wait
     if: github.event.repository.fork
     concurrency:
-      group: fork-release-${{ inputs.source_commit }}
+      group: fork-desktop-publication
       cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 20

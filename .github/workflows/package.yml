@@ -640,7 +640,7 @@ jobs:
   fork-release:
     name: Publish desktop fork build
     concurrency:
-      group: fork-release-${{ needs.prepare.outputs.commit }}
+      group: fork-desktop-publication
       cancel-in-progress: false
     needs: [prepare, windows, macos]
     if: inputs.platforms == 'windows-macos' && github.event.repository.fork

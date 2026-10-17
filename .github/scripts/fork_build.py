@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from urllib.parse import quote
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -217,8 +218,31 @@ def find_release(repository, tag):
     return next((release for page in pages for release in page if release["tag_name"] == tag), None)
 
 
+def latest_release(repository):
+    """Treat a missing latest release as empty, but propagate authentication and API errors."""
+    try:
+        return api(f"repos/{repository}/releases/latest")
+    except RuntimeError as error:
+        if "(HTTP 404)" not in str(error):
+            raise
+        return None
+
+
+def promote_release(repository, tag, commit, version):
+    """Expose verified downloads through Latest without rolling back to an older source."""
+    current = latest_release(repository)
+    latest = current is None or current["tag_name"] == tag
+    if not latest:
+        previous = quote(current["tag_name"], safe="")
+        comparison = api(f"repos/{repository}/compare/{previous}...{check_sha(commit)}")
+        latest = comparison["status"] in {"ahead", "identical"}
+    command("gh", "release", "edit", tag, "--repo", repository, "--draft=false", "--prerelease=false",
+            f"--latest={str(latest).lower()}", "--title", f"v{version} ({commit[:10]})")
+    return latest
+
+
 def publish():
-    """Publish an immutable prerelease only after every selected build succeeds."""
+    """Publish verified immutable downloads and move Latest to the newest successful source."""
     repository = os.environ["GITHUB_REPOSITORY"]
     commit = check_sha(os.environ["RELEASE_COMMIT"])
     version = os.environ["RELEASE_VERSION"]
@@ -232,6 +256,9 @@ def publish():
     existing = find_release(repository, tag)
     if existing and not existing["draft"]:
         # Rebuilding can change signatures and timestamps; published downloads are immutable.
+        if {asset["name"] for asset in existing["assets"]} != set(digests):
+            raise RuntimeError("Published release is missing the complete download set")
+        promote_release(repository, tag, commit, version)
         summary(f"Desktop release already published: {existing['html_url']}")
         return
     with tempfile.TemporaryDirectory() as scratch:
@@ -252,8 +279,7 @@ def publish():
     if release is None:
         raise RuntimeError("Uploaded draft release is not visible to this token")
     verify_upload(release, digests)
-    command("gh", "release", "edit", tag, "--repo", repository, "--draft=false", "--prerelease",
-            "--latest=false")
+    promote_release(repository, tag, commit, version)
     summary(f"Desktop release: https://github.com/{repository}/releases/tag/{tag}")
 
 

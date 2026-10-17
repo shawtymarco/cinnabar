@@ -35,11 +35,19 @@ All three builds must succeed before publication. Download names are derived
 from `packaging/release-assets.json`, checked for completeness, checksummed, and
 checked against the source provenance in the symbol archives, and verified
 against GitHub's uploaded SHA-256 digests. A complete set is published
-as an unofficial prerelease named `fork-desktop-<source SHA>`. Failed uploads
+as an unofficial release named `fork-desktop-<source SHA>`. Failed uploads
 leave a draft; prior published builds remain available. These builds do not
 replace official updater manifests or announce a release to the upstream API.
 Signing is optional for desktop packages; without signing secrets, Windows is
 unsigned and macOS is ad-hoc signed and unnotarized.
+
+The newest successful source becomes GitHub's **Latest** release and appears in
+the repository's Releases sidebar. `/releases/latest` and
+`/releases/latest/download/<asset name>` follow that complete download set.
+Installers, symbol archives and checksums are all included. Existing release
+files stay immutable; a failed build never replaces Latest. Publishers serialize
+the final upload and promotion, and an older recovery cannot move Latest backward.
+The Latest badge identifies this fork's build, not an official upstream release.
 
 Completed CI artifacts can also be published without rebuilding. Dispatch
 **Publish completed desktop build** on `dev`, with the Package `run_id` and
@@ -48,7 +56,7 @@ without holding the publication lock. It verifies that all three desktop jobs su
 downloads only their installers and symbols, and reads the version from that
 source commit. The symbol archives must identify the requested revision. The
 publication checks and draft-to-public transition are identical to automatic
-publication; both publishers serialize publication of the same source SHA.
+publication; both publishers share a single publication lock.
 
 GitHub may disable schedules after prolonged repository inactivity. Check Actions
 for sync failures, expired tokens, conflicts or disabled schedules. To pause this
