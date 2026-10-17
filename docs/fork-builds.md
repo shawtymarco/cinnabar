@@ -9,8 +9,7 @@ schedule is skipped on forks.
 Synchronization merges the parent's default branch into `dev`, preserving fork
 CI changes. It never force pushes. Merge conflicts stop the run without changing
 the remote branch. Automation and merge commits make `dev` ahead of upstream;
-this is expected. The former `fork-ci` branch is retained as historical backup
-and is no longer the default or the scheduler's target.
+this is expected. The former `fork-ci` branch is retired; automation runs on `dev`.
 
 If upstream changes workflow files, GitHub may reject a push made with the
 default `GITHUB_TOKEN`. Set the repository Actions secret `FORK_SYNC_TOKEN` to a
