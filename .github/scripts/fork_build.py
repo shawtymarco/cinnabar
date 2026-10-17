@@ -206,6 +206,32 @@ def verify_symbols(directory, manifest, version, commit):
                 raise RuntimeError(f"Artifact provenance mismatch: {name}")
 
 
+def verify_recovery_run(run, jobs, commit, manifest):
+    """Allow publication of completed desktop jobs even if an unselected platform failed."""
+    if run["path"] != f".github/workflows/{CONFIG['workflow']}" or run["status"] != "completed":
+        raise RuntimeError("Recovery requires a completed Package workflow")
+    if run["head_sha"] != commit and run["display_title"] != CONFIG["run_prefix"] + commit:
+        raise RuntimeError("Recovery source does not match the selected build")
+    required = {"windows"}
+    required.update(f"macOS {arch}" for arch in manifest["assets"]["macos"])
+    passed = {job["name"] for job in jobs if job["conclusion"] == "success"}
+    if missing := required - passed:
+        raise RuntimeError(f"Desktop jobs did not all succeed: {sorted(missing)}")
+
+
+def recover():
+    """Validate the requested CI run before downloading any recovery artifacts."""
+    run_id = os.environ["RECOVERY_RUN_ID"]
+    if not re.fullmatch(r"[1-9][0-9]*", run_id):
+        raise ValueError("Recovery run ID must be a positive integer")
+    repository = os.environ["GITHUB_REPOSITORY"]
+    run = api(f"repos/{repository}/actions/runs/{run_id}")
+    pages = api(f"repos/{repository}/actions/runs/{run_id}/jobs?per_page=100", "--paginate", "--slurp")
+    jobs = [job for page in pages for job in page["jobs"]]
+    manifest = json.loads((ROOT / "packaging/release-assets.json").read_text())
+    verify_recovery_run(run, jobs, check_sha(os.environ["RELEASE_COMMIT"]), manifest)
+
+
 def publish():
     """Publish an immutable prerelease only after every selected build succeeds."""
     repository = os.environ["GITHUB_REPOSITORY"]
@@ -227,7 +253,8 @@ def publish():
         return
     with tempfile.TemporaryDirectory() as scratch:
         notes = Path(scratch) / "notes.md"
-        run_url = f"https://github.com/{repository}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+        build_run = os.environ.get("RECOVERY_RUN_ID") or os.environ["GITHUB_RUN_ID"]
+        run_url = f"https://github.com/{repository}/actions/runs/{build_run}"
         notes.write_text(f"Source: `{commit}`\n\n[GitHub Actions build]({run_url})\n\n"
                          "Windows x64 and macOS Intel/Apple Silicon. Unofficial fork build; "
                          "desktop signing is optional. SHA256SUMS.txt verifies every download.\n",
@@ -247,7 +274,7 @@ def publish():
 
 if __name__ == "__main__":
     try:
-        {"sync": sync, "pin": pin, "publish": publish}[sys.argv[1]]()
+        {"sync": sync, "pin": pin, "publish": publish, "recover": recover}[sys.argv[1]]()
     except (KeyError, IndexError, OSError, RuntimeError, ValueError) as error:
         print(f"::error::{error}", file=sys.stderr)
         sys.exit(1)

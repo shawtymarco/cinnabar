@@ -1,0 +1,61 @@
+name: Publish completed desktop build
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed Package workflow run ID
+        required: true
+        type: string
+      source_commit:
+        description: Full source commit SHA recorded by that build
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    if: github.event.repository.fork
+    concurrency:
+      group: fork-release-${{ inputs.source_commit }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RECOVERY_RUN_ID: ${{ inputs.run_id }}
+      RELEASE_COMMIT: ${{ inputs.source_commit }}
+      PACKAGE_DIRECTORY: ${{ github.workspace }}/packages
+      CINNABAR_SOURCE_ROOT: ${{ github.workspace }}/source
+      CARGO_PROFILE_RELEASE_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          path: release-tools
+      - name: Verify desktop job results and source revision
+        run: python3 release-tools/.github/scripts/fork_build.py recover
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_commit }}
+          persist-credentials: false
+          path: source
+      - name: Read the version from the built source
+        run: |
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import pathlib, tomllib
+          metadata = tomllib.loads(pathlib.Path("source/Cargo.toml").read_text())
+          print("RELEASE_VERSION=" + metadata["workspace"]["package"]["version"])
+          PY
+      - uses: actions/download-artifact@v7
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          path: packages
+          pattern: '{macos-*,windows-x64,symbols-macos-*,symbols-windows-x64}'
+          merge-multiple: true
+      - name: Publish verified CI downloads without rebuilding
+        run: python3 release-tools/.github/scripts/fork_build.py publish

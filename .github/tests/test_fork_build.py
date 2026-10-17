@@ -212,6 +212,36 @@ class PublicationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             BUILD.verify_symbols(self.directory, self.manifest, self.version, "b" * 40)
 
+    def recovery_fixture(self):
+        run = {"path": ".github/workflows/" + BUILD.CONFIG["workflow"], "status": "completed",
+               "head_sha": COMMIT, "display_title": "Package"}
+        jobs = [{"name": "windows", "conclusion": "success"},
+                {"name": "Android arm64 APK", "conclusion": "failure"}]
+        jobs.extend({"name": f"macOS {arch}", "conclusion": "success"}
+                    for arch in self.manifest["assets"]["macos"])
+        return run, jobs
+
+    def test_recovery_allows_unselected_android_failure(self):
+        run, jobs = self.recovery_fixture()
+        BUILD.verify_recovery_run(run, jobs, COMMIT, self.manifest)
+
+    def test_recovery_rejects_failed_desktop_job(self):
+        run, jobs = self.recovery_fixture()
+        jobs[0]["conclusion"] = "failure"
+        with self.assertRaises(RuntimeError):
+            BUILD.verify_recovery_run(run, jobs, COMMIT, self.manifest)
+
+    def test_recovery_rejects_another_source(self):
+        run, jobs = self.recovery_fixture()
+        with self.assertRaises(RuntimeError):
+            BUILD.verify_recovery_run(run, jobs, "b" * 40, self.manifest)
+
+    def test_recovery_accepts_control_workflow_with_pinned_source(self):
+        run, jobs = self.recovery_fixture()
+        run["head_sha"] = "b" * 40
+        run["display_title"] = BUILD.CONFIG["run_prefix"] + COMMIT
+        BUILD.verify_recovery_run(run, jobs, COMMIT, self.manifest)
+
     def publish_environment(self):
         return patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/fork", "RELEASE_COMMIT": COMMIT,
                                       "RELEASE_VERSION": self.version, "GITHUB_RUN_ID": "123",

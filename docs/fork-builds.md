@@ -50,13 +50,13 @@ replace official updater manifests or announce a release to the upstream API.
 Signing is optional for desktop packages; without signing secrets, Windows is
 unsigned and macOS is ad-hoc signed and unnotarized.
 
-Completed CI artifacts can also be published without rebuilding. Check that all
-three desktop jobs succeeded, download their installer and symbol artifacts,
-and place their files in one empty directory. Run `.github/scripts/fork_build.py
-publish` with `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`, `RELEASE_COMMIT`,
-`RELEASE_VERSION` and `PACKAGE_DIRECTORY` referring to that exact CI run. The
-symbol archives must identify the requested source revision; the publication
-checks and draft-to-public transition are identical to automatic publication.
+Completed CI artifacts can also be published without rebuilding. Dispatch
+**Publish completed desktop build** on `fork-ci`, with the Package `run_id` and
+its full `source_commit`. It verifies that all three desktop jobs succeeded,
+downloads only their installers and symbols, and reads the version from that
+source commit. The symbol archives must identify the requested revision. The
+publication checks and draft-to-public transition are identical to automatic
+publication; both publishers serialize publication of the same source SHA.
 
 GitHub may disable schedules after prolonged repository inactivity. Check Actions
 for sync failures, expired tokens, conflicts or disabled schedules. To pause this
