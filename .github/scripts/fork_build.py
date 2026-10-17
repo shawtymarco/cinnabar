@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -78,6 +79,22 @@ def merge_upstream(root, branch, upstream_url, upstream_branch):
     return commit, upstream
 
 
+def mirror_upstream(root, branch, upstream_url, upstream_branch):
+    """Fast-forward the source branch to upstream exactly, without making a merge commit."""
+    git = lambda *args: command("git", *args, cwd=root)
+    git("check-ref-format", f"refs/heads/{branch}")
+    git("check-ref-format", f"refs/heads/{upstream_branch}")
+    git("fetch", "--no-tags", "origin", f"refs/heads/{branch}")
+    before = git("rev-parse", "FETCH_HEAD")
+    git("fetch", "--no-tags", upstream_url, f"refs/heads/{upstream_branch}")
+    commit = git("rev-parse", "FETCH_HEAD")
+    if before != commit:
+        # Unexpected local commits or an upstream history rewrite need an explicit resolution.
+        git("merge-base", "--is-ancestor", before, commit)
+        git("push", "origin", f"{commit}:refs/heads/{branch}")
+    return commit
+
+
 def summary(message):
     """Write the same actionable result to the log and Actions summary."""
     print(message)
@@ -87,38 +104,47 @@ def summary(message):
 
 
 def sync():
-    """Discover this fork's parent, merge its default branch, and dispatch one build."""
+    """Mirror application history separately from the default automation branch."""
     repository = os.environ["GITHUB_REPOSITORY"]
     metadata = api(f"repos/{repository}")
     if not metadata["fork"]:
         raise RuntimeError("Automatic fork sync must not run on an upstream repository")
     parent = metadata["parent"]
-    branch = metadata["default_branch"]
-    commit, upstream = merge_upstream(ROOT, branch, parent["clone_url"], parent["default_branch"])
+    branch = CONFIG["source_branch"]
+    control = CONFIG["control_branch"]
+    if metadata["default_branch"] != control or control == branch:
+        raise RuntimeError(f"Set the fork's default branch to {control} before synchronizing")
+    commit = mirror_upstream(ROOT, branch, parent["clone_url"], parent["default_branch"])
+    # Keep release tooling current without adding any automation commits to the source branch.
+    merge_upstream(ROOT, control, parent["clone_url"], parent["default_branch"])
     # Pagination retains a long-running build even if many other runs have finished.
     pages = api(f"repos/{repository}/actions/workflows/{CONFIG['workflow']}/runs?per_page=100",
                 "--paginate", "--slurp")
     runs = [run for page in pages for run in page["workflow_runs"]]
     decision = build_decision(runs, commit)
-    summary(f"Fork `{branch}`: `{commit}`; upstream `{upstream}`; build decision: **{decision}**.")
+    summary(f"Fork `{branch}` matches upstream `{commit}`; build decision: **{decision}**.")
     if decision == "failed-limit":
         raise RuntimeError("Desktop build failed twice. Inspect and rerun the Package workflow manually.")
     if decision != "build":
         return
     api(f"repos/{repository}/actions/workflows/{CONFIG['workflow']}/dispatches", "--method", "POST",
-        "-f", f"ref={branch}", "-f", "inputs[bump]=nightly", "-f", f"inputs[branch]={branch}",
+        "-f", f"ref={control}", "-f", "inputs[bump]=nightly", "-f", f"inputs[branch]={branch}",
         "-f", f"inputs[platforms]={CONFIG['selection']}", "-f", f"inputs[source_commit]={commit}")
     summary(f"Dispatched parallel Windows and macOS packaging for `{commit}`.")
 
 
 def pin():
-    """Attach an ancestor of the default branch without changing remote release refs."""
+    """Validate the source branch independently of the branch hosting the workflow."""
     branch = os.environ["TARGET_BRANCH"]
-    if os.environ["BUMP"] != "nightly" or branch != os.environ["DEFAULT_BRANCH"]:
-        raise RuntimeError("Pinned and desktop-only builds require nightly on the default branch")
-    if (os.environ.get("PLATFORMS") == CONFIG["selection"]
-            and os.environ.get("IS_FORK") != "true"):
+    desktop = os.environ.get("PLATFORMS") == CONFIG["selection"]
+    source_branch = CONFIG["source_branch"] if desktop else os.environ["DEFAULT_BRANCH"]
+    if os.environ["BUMP"] != "nightly" or branch != source_branch:
+        raise RuntimeError(f"Pinned nightly builds require source branch {source_branch}")
+    if desktop and os.environ.get("IS_FORK") != "true":
         raise RuntimeError("Desktop-only publishing is for forks")
+    if output := os.environ.get("GITHUB_OUTPUT"):
+        with open(output, "a", encoding="utf-8") as destination:
+            destination.write(f"source_branch={source_branch}\n")
     commit = os.environ.get("SOURCE_COMMIT", "")
     if not commit:
         return
@@ -168,6 +194,18 @@ def verify_upload(release, digests):
         raise RuntimeError("Uploaded release assets do not match the verified packages")
 
 
+def verify_symbols(directory, manifest, version, commit):
+    """Reject artifacts whose embedded provenance names another build or architecture."""
+    for platform in CONFIG["platforms"]:
+        for arch in manifest["assets"][platform]:
+            name = manifest["symbols"]["archive"].format(version=version, platform=platform, arch=arch)
+            with zipfile.ZipFile(directory / name) as archive:
+                metadata = json.loads(archive.read(manifest["symbols"]["manifest"]))
+            expected = {"commit": commit, "version": version, "platform": f"{platform}-{arch}"}
+            if any(metadata.get(key) != value for key, value in expected.items()):
+                raise RuntimeError(f"Artifact provenance mismatch: {name}")
+
+
 def publish():
     """Publish an immutable prerelease only after every selected build succeeds."""
     repository = os.environ["GITHUB_REPOSITORY"]
@@ -176,6 +214,8 @@ def publish():
     directory = Path(os.environ["PACKAGE_DIRECTORY"]).resolve()
     manifest = json.loads((ROOT / "packaging/release-assets.json").read_text())
     symbols = command(sys.executable, str(ROOT / "packaging/release-symbols.py"), "has-symbols") == "true"
+    if symbols:
+        verify_symbols(directory, manifest, version, commit)
     digests = checksums(directory, manifest, version, symbols)
     tag = CONFIG["release_prefix"] + commit
     # Drafts are visible only to writers, so enumerate them using authenticated REST.

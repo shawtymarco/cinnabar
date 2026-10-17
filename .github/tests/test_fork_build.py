@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 
@@ -130,6 +131,40 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(self.git(self.work, "rev-parse", "HEAD"), selected)
         self.assertEqual(self.git(self.work, "symbolic-ref", "--short", "HEAD"), "dev")
 
+    def test_mirror_has_identical_upstream_history_and_preserves_control_branch(self):
+        control = BUILD.CONFIG["control_branch"]
+        self.git(self.work, "push", "origin", f"HEAD:refs/heads/{control}")
+        control_head = self.git(self.origin, "rev-parse", control)
+        original = self.git(self.upstream, "rev-parse", "HEAD")
+        # Bootstrap mirrors once the fork's automation commits are on their own branch.
+        self.git(self.work, "push", "--force", "origin", f"{original}:refs/heads/dev")
+        upstream = self.commit(self.upstream, "app.txt", "new upstream\n")
+        self.assertEqual(BUILD.mirror_upstream(self.work, "dev", str(self.upstream), "dev"), upstream)
+        self.assertEqual(self.git(self.origin, "rev-parse", "dev"), upstream)
+        self.assertEqual(self.git(self.origin, "rev-parse", control), control_head)
+        self.assertEqual(BUILD.mirror_upstream(self.work, "dev", str(self.upstream), "dev"), upstream)
+
+    def test_mirror_refuses_to_discard_unexpected_source_commits(self):
+        before = self.git(self.origin, "rev-parse", "dev")
+        self.commit(self.upstream, "app.txt", "new upstream\n")
+        with self.assertRaises(RuntimeError):
+            BUILD.mirror_upstream(self.work, "dev", str(self.upstream), "dev")
+        self.assertEqual(self.git(self.origin, "rev-parse", "dev"), before)
+
+    def test_desktop_pin_accepts_source_branch_with_separate_default_branch(self):
+        selected = self.git(self.work, "rev-parse", "HEAD")
+        self.git(self.work, "checkout", "--detach", selected)
+        with patch.dict(os.environ, {"TARGET_BRANCH": "dev", "DEFAULT_BRANCH": BUILD.CONFIG["control_branch"],
+                                     "BUMP": "nightly", "SOURCE_COMMIT": selected, "IS_FORK": "true",
+                                     "PLATFORMS": BUILD.CONFIG["selection"]}):
+            previous = Path.cwd()
+            try:
+                os.chdir(self.work)
+                BUILD.pin()
+            finally:
+                os.chdir(previous)
+        self.assertEqual(self.git(self.work, "rev-parse", "HEAD"), selected)
+
 
 class PublicationTests(unittest.TestCase):
     def setUp(self):
@@ -141,6 +176,13 @@ class PublicationTests(unittest.TestCase):
         self.names = BUILD.expected_assets(self.manifest, self.version, True)
         for name in self.names:
             (self.directory / name).write_bytes(name.encode())
+        for platform in BUILD.CONFIG["platforms"]:
+            for arch in self.manifest["assets"][platform]:
+                name = self.manifest["symbols"]["archive"].format(
+                    version=self.version, platform=platform, arch=arch)
+                with zipfile.ZipFile(self.directory / name, "w") as archive:
+                    archive.writestr(self.manifest["symbols"]["manifest"], json.dumps({
+                        "commit": COMMIT, "version": self.version, "platform": f"{platform}-{arch}"}))
 
     def test_all_selected_architectures_are_required(self):
         for platform in BUILD.CONFIG["platforms"]:
@@ -164,6 +206,11 @@ class PublicationTests(unittest.TestCase):
         (self.directory / "unexpected.apk").touch()
         with self.assertRaises(RuntimeError):
             BUILD.checksums(self.directory, self.manifest, self.version, True)
+
+    def test_symbols_must_name_the_requested_source_commit(self):
+        BUILD.verify_symbols(self.directory, self.manifest, self.version, COMMIT)
+        with self.assertRaises(RuntimeError):
+            BUILD.verify_symbols(self.directory, self.manifest, self.version, "b" * 40)
 
     def publish_environment(self):
         return patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/fork", "RELEASE_COMMIT": COMMIT,

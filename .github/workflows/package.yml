@@ -85,6 +85,7 @@ jobs:
           path: release-tools
           persist-credentials: false
       - name: Validate the desktop selection and pinned nightly source
+        id: pin
         if: inputs.source_commit != '' || inputs.platforms == 'windows-macos'
         env:
           SOURCE_COMMIT: ${{ inputs.source_commit }}
@@ -101,7 +102,7 @@ jobs:
           BUMP: ${{ inputs.bump || 'current' }}
           CUSTOM_VERSION: ${{ inputs.version }}
           TARGET_BRANCH: ${{ inputs.branch || github.ref_name }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DEFAULT_BRANCH: ${{ steps.pin.outputs.source_branch || github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
         run: python3 "$GITHUB_WORKSPACE/release-tools/packaging/prepare-release.py"
 
@@ -234,7 +235,7 @@ jobs:
           hdiutil detach "$mount"
           exit "$status"
       - name: Save Rust release build cache
-        if: ${{ !cancelled() && github.ref == 'refs/heads/dev' }}
+        if: ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         # A cache problem, reported as an annotation, must not stop the release.
         continue-on-error: true
         uses: ./release-tools/.github/actions/build-cache
@@ -248,7 +249,7 @@ jobs:
           paths: ${{ steps.rust-cache.outputs.paths }}
           prefix: ${{ steps.rust-cache.outputs.prefix }}
       - name: Save Go build cache
-        if: ${{ !cancelled() && github.ref == 'refs/heads/dev' }}
+        if: ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         # A cache problem, reported as an annotation, must not stop the release.
         continue-on-error: true
         uses: ./release-tools/.github/actions/build-cache
@@ -379,7 +380,7 @@ jobs:
             '/quiet', '/norestart', '/log', ('"' + $log + '"')) -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { Get-Content $log; throw "Setup layout failed: $($process.ExitCode)" }
       - name: Save Rust release build cache
-        if: ${{ !cancelled() && github.ref == 'refs/heads/dev' }}
+        if: ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         # A cache problem, reported as an annotation, must not stop the release.
         continue-on-error: true
         uses: ./release-tools/.github/actions/build-cache
@@ -393,7 +394,7 @@ jobs:
           paths: ${{ steps.rust-cache.outputs.paths }}
           prefix: ${{ steps.rust-cache.outputs.prefix }}
       - name: Save Go build cache
-        if: ${{ !cancelled() && github.ref == 'refs/heads/dev' }}
+        if: ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         # A cache problem, reported as an annotation, must not stop the release.
         continue-on-error: true
         uses: ./release-tools/.github/actions/build-cache
@@ -515,7 +516,7 @@ jobs:
           "./$RELEASE_ASSET" --appimage-extract > /dev/null
           bash "$GITHUB_WORKSPACE/release-tools/packaging/check-payload.sh" linux "$RUNNER_TEMP/squashfs-root"
       - name: Save Rust release build cache
-        if: ${{ !cancelled() && github.ref == 'refs/heads/dev' }}
+        if: ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         # A cache problem, reported as an annotation, must not stop the release.
         continue-on-error: true
         uses: ./release-tools/.github/actions/build-cache
@@ -529,7 +530,7 @@ jobs:
           paths: ${{ steps.rust-cache.outputs.paths }}
           prefix: ${{ steps.rust-cache.outputs.prefix }}
       - name: Save Go build cache
-        if: ${{ !cancelled() && github.ref == 'refs/heads/dev' }}
+        if: ${{ !cancelled() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         # A cache problem, reported as an annotation, must not stop the release.
         continue-on-error: true
         uses: ./release-tools/.github/actions/build-cache

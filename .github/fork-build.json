@@ -1,5 +1,7 @@
 {
   "workflow": "package.yml",
+  "source_branch": "dev",
+  "control_branch": "fork-ci",
   "platforms": ["windows", "macos"],
   "selection": "windows-macos",
   "run_prefix": "Desktop ",

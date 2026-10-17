@@ -2,7 +2,7 @@ name: Sync fork and build desktops
 
 on:
   schedule:
-    - cron: '7-57/10 * * * *'
+    - cron: '2-57/5 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0
           # Needed when upstream changes workflow files; no token is exposed to build jobs.
           token: ${{ secrets.FORK_SYNC_TOKEN || github.token }}
-      - name: Merge upstream and dispatch a changed desktop build
+      - name: Mirror upstream and dispatch a changed desktop build
         env:
           GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN || github.token }}
         run: python3 .github/scripts/fork_build.py sync
