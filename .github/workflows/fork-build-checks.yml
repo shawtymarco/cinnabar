@@ -1,0 +1,24 @@
+name: Fork build checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/fork-build.json'
+      - '.github/scripts/fork_build.py'
+      - '.github/tests/test_fork_build.py'
+      - '.github/workflows/fork-*.yml'
+      - '.github/workflows/package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s .github/tests -p test_fork_build.py -v
