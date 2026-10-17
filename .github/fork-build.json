@@ -1,0 +1,8 @@
+{
+  "workflow": "package.yml",
+  "platforms": ["windows", "macos"],
+  "selection": "windows-macos",
+  "run_prefix": "Desktop ",
+  "release_prefix": "fork-desktop-",
+  "max_attempts": 2
+}
