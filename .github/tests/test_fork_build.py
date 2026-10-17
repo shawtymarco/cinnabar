@@ -24,6 +24,18 @@ def run_record(commit=COMMIT, status="completed", conclusion="failure", attempt=
 
 
 class DecisionTests(unittest.TestCase):
+    def test_sync_merges_and_dispatches_on_the_default_branch(self):
+        metadata = {"fork": True, "default_branch": "dev", "parent": {
+            "clone_url": "https://example.invalid/upstream.git", "default_branch": "dev"}}
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/fork"}), \
+                patch.object(BUILD, "merge_upstream", return_value=(COMMIT, "b" * 40)) as merge, \
+                patch.object(BUILD, "api", side_effect=[metadata, [], None]) as api:
+            BUILD.sync()
+        self.assertEqual(merge.call_args.args[1], "dev")
+        self.assertIn("ref=dev", api.call_args.args)
+        self.assertIn("inputs[branch]=dev", api.call_args.args)
+        self.assertIn("inputs[source_commit]=" + COMMIT, api.call_args.args)
+
     def test_new_revision_builds(self):
         self.assertEqual(BUILD.build_decision([run_record("b" * 40)], COMMIT), "build")
 
@@ -131,39 +143,6 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(self.git(self.work, "rev-parse", "HEAD"), selected)
         self.assertEqual(self.git(self.work, "symbolic-ref", "--short", "HEAD"), "dev")
 
-    def test_mirror_has_identical_upstream_history_and_preserves_control_branch(self):
-        control = BUILD.CONFIG["control_branch"]
-        self.git(self.work, "push", "origin", f"HEAD:refs/heads/{control}")
-        control_head = self.git(self.origin, "rev-parse", control)
-        original = self.git(self.upstream, "rev-parse", "HEAD")
-        # Bootstrap mirrors once the fork's automation commits are on their own branch.
-        self.git(self.work, "push", "--force", "origin", f"{original}:refs/heads/dev")
-        upstream = self.commit(self.upstream, "app.txt", "new upstream\n")
-        self.assertEqual(BUILD.mirror_upstream(self.work, "dev", str(self.upstream), "dev"), upstream)
-        self.assertEqual(self.git(self.origin, "rev-parse", "dev"), upstream)
-        self.assertEqual(self.git(self.origin, "rev-parse", control), control_head)
-        self.assertEqual(BUILD.mirror_upstream(self.work, "dev", str(self.upstream), "dev"), upstream)
-
-    def test_mirror_refuses_to_discard_unexpected_source_commits(self):
-        before = self.git(self.origin, "rev-parse", "dev")
-        self.commit(self.upstream, "app.txt", "new upstream\n")
-        with self.assertRaises(RuntimeError):
-            BUILD.mirror_upstream(self.work, "dev", str(self.upstream), "dev")
-        self.assertEqual(self.git(self.origin, "rev-parse", "dev"), before)
-
-    def test_desktop_pin_accepts_source_branch_with_separate_default_branch(self):
-        selected = self.git(self.work, "rev-parse", "HEAD")
-        self.git(self.work, "checkout", "--detach", selected)
-        with patch.dict(os.environ, {"TARGET_BRANCH": "dev", "DEFAULT_BRANCH": BUILD.CONFIG["control_branch"],
-                                     "BUMP": "nightly", "SOURCE_COMMIT": selected, "IS_FORK": "true",
-                                     "PLATFORMS": BUILD.CONFIG["selection"]}):
-            previous = Path.cwd()
-            try:
-                os.chdir(self.work)
-                BUILD.pin()
-            finally:
-                os.chdir(previous)
-        self.assertEqual(self.git(self.work, "rev-parse", "HEAD"), selected)
 
 
 class PublicationTests(unittest.TestCase):

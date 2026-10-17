@@ -79,22 +79,6 @@ def merge_upstream(root, branch, upstream_url, upstream_branch):
     return commit, upstream
 
 
-def mirror_upstream(root, branch, upstream_url, upstream_branch):
-    """Fast-forward the source branch to upstream exactly, without making a merge commit."""
-    git = lambda *args: command("git", *args, cwd=root)
-    git("check-ref-format", f"refs/heads/{branch}")
-    git("check-ref-format", f"refs/heads/{upstream_branch}")
-    git("fetch", "--no-tags", "origin", f"refs/heads/{branch}")
-    before = git("rev-parse", "FETCH_HEAD")
-    git("fetch", "--no-tags", upstream_url, f"refs/heads/{upstream_branch}")
-    commit = git("rev-parse", "FETCH_HEAD")
-    if before != commit:
-        # Unexpected local commits or an upstream history rewrite need an explicit resolution.
-        git("merge-base", "--is-ancestor", before, commit)
-        git("push", "origin", f"{commit}:refs/heads/{branch}")
-    return commit
-
-
 def summary(message):
     """Write the same actionable result to the log and Actions summary."""
     print(message)
@@ -104,31 +88,26 @@ def summary(message):
 
 
 def sync():
-    """Mirror application history separately from the default automation branch."""
+    """Discover this fork's parent, merge its default branch, and dispatch one build."""
     repository = os.environ["GITHUB_REPOSITORY"]
     metadata = api(f"repos/{repository}")
     if not metadata["fork"]:
         raise RuntimeError("Automatic fork sync must not run on an upstream repository")
     parent = metadata["parent"]
-    branch = CONFIG["source_branch"]
-    control = CONFIG["control_branch"]
-    if metadata["default_branch"] != control or control == branch:
-        raise RuntimeError(f"Set the fork's default branch to {control} before synchronizing")
-    commit = mirror_upstream(ROOT, branch, parent["clone_url"], parent["default_branch"])
-    # Keep release tooling current without adding any automation commits to the source branch.
-    merge_upstream(ROOT, control, parent["clone_url"], parent["default_branch"])
+    branch = metadata["default_branch"]
+    commit, upstream = merge_upstream(ROOT, branch, parent["clone_url"], parent["default_branch"])
     # Pagination retains a long-running build even if many other runs have finished.
     pages = api(f"repos/{repository}/actions/workflows/{CONFIG['workflow']}/runs?per_page=100",
                 "--paginate", "--slurp")
     runs = [run for page in pages for run in page["workflow_runs"]]
     decision = build_decision(runs, commit)
-    summary(f"Fork `{branch}` matches upstream `{commit}`; build decision: **{decision}**.")
+    summary(f"Fork `{branch}`: `{commit}`; upstream `{upstream}`; build decision: **{decision}**.")
     if decision == "failed-limit":
         raise RuntimeError("Desktop build failed twice. Inspect and rerun the Package workflow manually.")
     if decision != "build":
         return
     api(f"repos/{repository}/actions/workflows/{CONFIG['workflow']}/dispatches", "--method", "POST",
-        "-f", f"ref={control}", "-f", "inputs[bump]=nightly", "-f", f"inputs[branch]={branch}",
+        "-f", f"ref={branch}", "-f", "inputs[bump]=nightly", "-f", f"inputs[branch]={branch}",
         "-f", f"inputs[platforms]={CONFIG['selection']}", "-f", f"inputs[source_commit]={commit}")
     summary(f"Dispatched parallel Windows and macOS packaging for `{commit}`.")
 

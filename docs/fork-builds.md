@@ -1,24 +1,16 @@
 # Automatic desktop builds on a fork
 
-The fork's default branch is `fork-ci`, which owns this configuration. `Sync fork
-and build desktops` checks the parent repository's default branch every five minutes,
-at minutes 2, 7, 12, 17 and so on. Five minutes is GitHub's minimum supported
-schedule interval. GitHub can delay scheduled runs; this is a
-polling interval, not a build completion deadline. The existing daily Package
+The default branch is `dev`, containing both application code and fork CI.
+`Sync fork and build desktops` checks upstream every five minutes, at minutes
+2, 7, 12, 17 and so on. Five minutes is GitHub's minimum supported schedule
+interval; queueing may delay actual execution. The inherited daily Package
 schedule is skipped on forks.
 
-The sync fast-forwards `dev` to the exact upstream commit, so `dev` has no extra
-automation or merge commits. It also merges upstream into `fork-ci` to keep
-release tooling current while preserving the fork's CI changes. It never force
-pushes: unexpected commits on `dev` or conflicts on `fork-ci` require manual
-resolution. A control-branch conflict does not undo an already completed source
-sync, but prevents dispatch until resolved. Other branches, including `main`,
-are left alone. `fork-ci` will be ahead of upstream; `dev` remains an exact mirror.
-
-When migrating from automation on `dev`, first preserve that branch as `fork-ci`,
-install this configuration there, and select it as the repository default. Only
-then reset `dev` to upstream using an explicit lease on its previous SHA. This
-one-time migration is separate from the scheduler, which never resets history.
+Synchronization merges the parent's default branch into `dev`, preserving fork
+CI changes. It never force pushes. Merge conflicts stop the run without changing
+the remote branch. Automation and merge commits make `dev` ahead of upstream;
+this is expected. The former `fork-ci` branch is retained as historical backup
+and is no longer the default or the scheduler's target.
 
 If upstream changes workflow files, GitHub may reject a push made with the
 default `GITHUB_TOKEN`. Set the repository Actions secret `FORK_SYNC_TOKEN` to a
@@ -31,7 +23,7 @@ Only one Package run is dispatched at a time. New commits arriving during a
 build accumulate on `dev`; the next poll builds the newest revision. A successful
 revision is not rebuilt. Failed or cancelled revisions get at most two attempts
 including manual reruns, then need attention. Use **Re-run failed jobs**, or
-manually dispatch Package on `fork-ci` with `bump=nightly`,
+manually dispatch Package on `dev` with `bump=nightly`,
 `platforms=windows-macos`, `branch=dev`, and `source_commit` set to the desired
 upstream SHA. A new source revision gets its own retry budget.
 
@@ -51,7 +43,7 @@ Signing is optional for desktop packages; without signing secrets, Windows is
 unsigned and macOS is ad-hoc signed and unnotarized.
 
 Completed CI artifacts can also be published without rebuilding. Dispatch
-**Publish completed desktop build** on `fork-ci`, with the Package `run_id` and
+**Publish completed desktop build** on `dev`, with the Package `run_id` and
 its full `source_commit`. If the original run is still active, recovery waits
 without holding the publication lock. It verifies that all three desktop jobs succeeded,
 downloads only their installers and symbols, and reads the version from that

@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0
           # Needed when upstream changes workflow files; no token is exposed to build jobs.
           token: ${{ secrets.FORK_SYNC_TOKEN || github.token }}
-      - name: Mirror upstream and dispatch a changed desktop build
+      - name: Merge upstream and dispatch a changed desktop build
         env:
           GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN || github.token }}
         run: python3 .github/scripts/fork_build.py sync
