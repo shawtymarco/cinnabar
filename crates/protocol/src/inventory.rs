@@ -23,6 +23,11 @@ pub use creative::{
     CreativeCategory, CreativeContentEvent, CreativeGroup, CreativeItem, MAX_CREATIVE_GROUPS,
     MAX_CREATIVE_ITEMS, normalize_creative_content,
 };
+mod options;
+pub(crate) use options::normalize_inventory_options;
+pub use options::{
+    InventoryLayout, InventoryOptions, InventoryRightTab, InventoryTab, inventory_options_packet,
+};
 mod furnace_options;
 pub(crate) use furnace_options::normalize_furnace_options;
 pub use furnace_options::{
@@ -246,6 +251,7 @@ pub enum InventoryEvent {
     Data(ContainerDataEvent),
     EnchantOptions(EnchantOptionsEvent),
     FurnaceOptions(FurnaceOptionsEvent),
+    Options(InventoryOptions),
     Creative(CreativeContentEvent),
 }
 
@@ -435,6 +441,15 @@ impl VerifiedNetworkItemStack {
             )),
             user_data_buffer: bytes::Bytes::copy_from_slice(&self.inner.extra_data),
         })
+    }
+
+    /// Preserves selected transaction item contents while omitting its optional stack identity.
+    pub(crate) fn into_selected_vendor_item(
+        self,
+    ) -> Result<ItemStackDescriptor, InventoryPacketError> {
+        let mut item = self.into_vendor_item()?;
+        item.net_id_variant = None;
+        Ok(item)
     }
 }
 
