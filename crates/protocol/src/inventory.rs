@@ -23,6 +23,8 @@ pub use creative::{
     CreativeCategory, CreativeContentEvent, CreativeGroup, CreativeItem, MAX_CREATIVE_GROUPS,
     MAX_CREATIVE_ITEMS, normalize_creative_content,
 };
+mod crafting_rules;
+pub use crafting_rules::CraftingRules;
 mod options;
 pub(crate) use options::normalize_inventory_options;
 pub use options::{
@@ -238,6 +240,8 @@ pub const MAX_ENCHANT_OPTIONS: usize = 8;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InventoryEvent {
     Recipes(recipes::RecipeUpdate),
+    RecipeUnlocks(recipes::RecipeUnlockUpdate),
+    CraftingRules(CraftingRules),
     Authority(InventoryAuthority),
     Content(InventoryContentEvent),
     Slot(InventorySlotEvent),

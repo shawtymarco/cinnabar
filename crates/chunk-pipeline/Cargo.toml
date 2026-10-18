@@ -44,12 +44,12 @@ libc = "0.2"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading"] }
 
 [dev-dependencies]
+protocol = { path = "../protocol" }
 protocol-ids = { path = "../protocol-ids" }
 mimalloc.workspace = true
 test-alloc = { path = "../test-alloc" }
 test-time = { path = "../test-time" }
 serde_json = "1"
-protocol = { path = "../protocol" }
 criterion.workspace = true
 
 [[bench]]

@@ -21,6 +21,8 @@ fn mesh() -> GeometrySpec {
 fn drawing(geometry: Handle) -> Instance {
     Instance {
         geometry,
+        material: None,
+        params: mod_api::materials::Preset::default().0,
         anchor: Anchor::World {
             dimension: 0,
             origin: [0.; 3],
@@ -290,6 +292,112 @@ fn triangle_expansion_preserves_indices_and_zero_length_lines_emit_nothing() {
     assert!(super::mesh::build(&store.snapshot().geometry[&line]).is_empty());
 }
 
+/// Names a session-bound actor incarnation for lifetime probes.
+fn actor(spawn_revision: u64) -> EntityKey {
+    EntityKey {
+        session: 1,
+        dimension: 0,
+        runtime_id: 7,
+        spawn_revision,
+    }
+}
+
+#[test]
+fn absent_candidates_preserve_instances_but_confirmed_despawn_removes_them() {
+    let mut store = Store::default();
+    store.bind_session(1, 0);
+    store.reconcile_entities(vec![actor(1)], &[]).unwrap();
+    let target = store.observe_entities().unwrap()[0].0;
+    let geometry = store.create_geometry(mesh()).unwrap();
+    let material = store
+        .create_material(crate::material::BUILTIN, DrawingPermissions::ALL)
+        .unwrap();
+    let mut instance = drawing(geometry);
+    instance.material = Some(material);
+    instance.params = mod_api::materials::Preset::rainbow(2.).0;
+    instance.anchor = Anchor::Entity(EntityAnchor {
+        entity: target,
+        body_rotation: false,
+    });
+    store
+        .create(instance.clone(), DrawingPermissions::ALL)
+        .unwrap();
+    store.commit();
+    let before = Arc::clone(store.snapshot());
+    store.reconcile_entities(Vec::new(), &[]).unwrap();
+    assert_eq!(store.snapshot().instances.len(), 1);
+    store
+        .reconcile_entities(vec![actor(2)], &[actor(1)])
+        .unwrap();
+    assert!(store.snapshot().instances.is_empty());
+    assert!(Arc::ptr_eq(
+        &before.materials[&material],
+        &store.snapshot().materials[&material]
+    ));
+    assert_eq!(before.material_revision, store.snapshot().material_revision);
+    assert_eq!(
+        store
+            .create(instance, DrawingPermissions::ALL)
+            .unwrap_err()
+            .code,
+        ErrorCode::StaleHandle
+    );
+    let replacement = store.observe_entities().unwrap()[0].0;
+    assert_ne!(target, replacement);
+}
+
+#[test]
+fn entity_references_are_owner_scoped_and_cannot_be_freed_while_attached() {
+    let mut first = Store::default();
+    let mut second = Store::default();
+    first.reconcile_entities(vec![actor(1)], &[]).unwrap();
+    let target = first.observe_entities().unwrap()[0].0;
+    let geometry = second.create_geometry(mesh()).unwrap();
+    let mut instance = drawing(geometry);
+    instance.anchor = Anchor::Entity(EntityAnchor {
+        entity: target,
+        body_rotation: true,
+    });
+    assert_eq!(
+        second
+            .create(instance, DrawingPermissions::ALL)
+            .unwrap_err()
+            .code,
+        ErrorCode::StaleHandle
+    );
+    let geometry = first.create_geometry(mesh()).unwrap();
+    let mut instance = drawing(geometry);
+    instance.anchor = Anchor::Entity(EntityAnchor {
+        entity: target,
+        body_rotation: false,
+    });
+    first.create(instance, DrawingPermissions::ALL).unwrap();
+    assert_eq!(first.remove(target).unwrap_err().code, ErrorCode::InUse);
+}
+
+#[test]
+fn entity_reference_capacity_errors_preserve_the_previous_selection() {
+    let mut store = Store::default();
+    let first: Vec<_> = (0..mod_api::MAX_DRAW_ENTITIES)
+        .map(|index| EntityKey {
+            runtime_id: index as u64 + 1,
+            ..actor(1)
+        })
+        .collect();
+    store.reconcile_entities(first, &[]).unwrap();
+    store.observe_entities().unwrap();
+    store.commit();
+    let previous = Arc::clone(store.snapshot());
+    store.begin();
+    store.reconcile_entities(vec![actor(2)], &[]).unwrap();
+    assert_eq!(
+        store.observe_entities().unwrap_err().detail,
+        "entity handles"
+    );
+    store.rollback();
+    assert!(Arc::ptr_eq(&previous, store.snapshot()));
+}
+
 #[test]
 fn distinct_polyline_endpoints_survive_expansion_before_instance_scaling() {
     for axis in 0..3 {
@@ -498,4 +606,227 @@ fn unchanged_updates_stage_nothing_and_keep_the_snapshot() {
     assert_eq!(store.mutation_bytes, 0);
     store.commit();
     assert!(Arc::ptr_eq(&before, store.snapshot()));
+}
+
+#[test]
+fn material_only_callbacks_publish_without_replacing_unchanged_snapshots() {
+    let mut store = Store::default();
+    let before = store.snapshot().clone();
+    let material = store
+        .create_material(crate::material::BUILTIN, DrawingPermissions::ALL)
+        .unwrap();
+    store.commit();
+    assert!(store.snapshot().materials.contains_key(&material));
+    assert!(!Arc::ptr_eq(&before, store.snapshot()));
+
+    let before = store.snapshot().clone();
+    store.begin();
+    store.commit();
+    assert!(Arc::ptr_eq(&before, store.snapshot()));
+
+    store.begin();
+    store.remove(material).unwrap();
+    store.rollback();
+    assert!(Arc::ptr_eq(&before, store.snapshot()));
+
+    store.begin();
+    store.remove(material).unwrap();
+    store.commit();
+    assert!(store.snapshot().materials.is_empty());
+    assert!(!Arc::ptr_eq(&before, store.snapshot()));
+    assert!(before.materials.contains_key(&material));
+}
+
+#[test]
+fn materials_require_authority_and_share_transaction_and_handle_lifetimes() {
+    let mut store = Store::default();
+    let mut denied = DrawingPermissions::ALL;
+    denied.render_material = false;
+    let source = crate::material::BUILTIN;
+    assert_eq!(
+        store.create_material(source, denied).unwrap_err().code,
+        ErrorCode::Denied
+    );
+    let stale = store
+        .create_material(source, DrawingPermissions::ALL)
+        .unwrap();
+    store.rollback();
+    store.begin();
+    let material = store
+        .create_material(source, DrawingPermissions::ALL)
+        .unwrap();
+    let geometry = store.create_geometry(mesh()).unwrap();
+    let mut foreign = Store::default();
+    let other = foreign
+        .create_material(source, DrawingPermissions::ALL)
+        .unwrap();
+    let mut instance = drawing(geometry);
+    instance.material = Some(other);
+    assert_eq!(
+        store
+            .create(instance.clone(), DrawingPermissions::ALL)
+            .unwrap_err()
+            .code,
+        ErrorCode::StaleHandle
+    );
+    instance.material = Some(stale);
+    assert_eq!(
+        store
+            .create(instance.clone(), DrawingPermissions::ALL)
+            .unwrap_err()
+            .code,
+        ErrorCode::StaleHandle
+    );
+    instance.material = Some(material);
+    assert_eq!(
+        store.create(instance.clone(), denied).unwrap_err().code,
+        ErrorCode::Denied
+    );
+    let id = store
+        .create(instance.clone(), DrawingPermissions::ALL)
+        .unwrap();
+    store.commit();
+    assert_eq!(store.remove(material).unwrap_err().code, ErrorCode::InUse);
+    let snapshot = store.snapshot().clone();
+    store.begin();
+    instance.params = mod_api::materials::Preset::rainbow(2.).0;
+    store.update(id, instance, DrawingPermissions::ALL).unwrap();
+    store.commit();
+    assert!(Arc::ptr_eq(
+        &snapshot.geometry[&geometry],
+        &store.snapshot().geometry[&geometry]
+    ));
+    store.remove(id).unwrap();
+    store.remove(material).unwrap();
+    store.commit();
+    assert!(store.snapshot().materials.is_empty());
+    store.revoke();
+    assert_eq!(
+        store.remove(material).unwrap_err().code,
+        ErrorCode::StaleHandle
+    );
+}
+
+#[test]
+fn rejected_compiles_and_retiring_materials_consume_their_budgets() {
+    let mut store = Store::default();
+    assert_eq!(
+        store
+            .create_material("bad source", DrawingPermissions::ALL)
+            .unwrap_err()
+            .code,
+        ErrorCode::Invalid
+    );
+    assert_eq!(
+        store
+            .create_material(crate::material::BUILTIN, DrawingPermissions::ALL)
+            .unwrap_err()
+            .code,
+        ErrorCode::BudgetExceeded
+    );
+    let mut handles = Vec::new();
+    for _ in 0..mod_api::MAX_DRAW_MATERIALS {
+        store.begin();
+        handles.push(
+            store
+                .create_material(crate::material::BUILTIN, DrawingPermissions::ALL)
+                .unwrap(),
+        );
+        store.commit();
+    }
+    let snapshot = store.snapshot().clone();
+    store.begin();
+    store.remove(handles[0]).unwrap();
+    store.commit();
+    store.begin();
+    assert_eq!(
+        store
+            .create_material(crate::material::BUILTIN, DrawingPermissions::ALL)
+            .unwrap_err()
+            .code,
+        ErrorCode::BudgetExceeded
+    );
+    drop(snapshot);
+    store.commit();
+    store.begin();
+    store
+        .create_material(crate::material::BUILTIN, DrawingPermissions::ALL)
+        .unwrap();
+}
+
+#[test]
+fn rolling_back_material_removal_does_not_double_charge_a_live_resource() {
+    let mut store = Store::default();
+    let material = store
+        .create_material(crate::material::BUILTIN, DrawingPermissions::ALL)
+        .unwrap();
+    store.commit();
+    for _ in 0..3 {
+        store.begin();
+        store.remove(material).unwrap();
+        store.rollback();
+    }
+    for _ in 1..mod_api::MAX_DRAW_MATERIALS {
+        store.begin();
+        store
+            .create_material(crate::material::BUILTIN, DrawingPermissions::ALL)
+            .unwrap();
+        store.commit();
+    }
+    assert_eq!(
+        store.snapshot().materials.len(),
+        mod_api::MAX_DRAW_MATERIALS
+    );
+}
+
+#[test]
+fn entity_observations_commit_without_geometry_or_instance_edits() {
+    let mut store = Store::default();
+    store.bind_session(1, 0);
+    store.reconcile_entities(vec![actor(1)], &[]).unwrap();
+    let observed = store.observe_entities().unwrap();
+    assert!(store.snapshot().entities.is_empty());
+    store.commit();
+    assert_eq!(
+        store.snapshot().entities.get(&observed[0].0),
+        Some(&actor(1))
+    );
+
+    let previous = Arc::clone(store.snapshot());
+    store.begin();
+    assert_eq!(store.observe_entities().unwrap(), observed);
+    store.commit();
+    assert!(Arc::ptr_eq(&previous, store.snapshot()));
+
+    let geometry = store.create_geometry(mesh()).unwrap();
+    let mut instance = drawing(geometry);
+    instance.anchor = Anchor::Entity(EntityAnchor {
+        entity: observed[0].0,
+        body_rotation: false,
+    });
+    store.create(instance, DrawingPermissions::ALL).unwrap();
+}
+
+#[test]
+fn entity_reference_release_commits_without_geometry_or_instance_edits() {
+    let mut store = Store::default();
+    store.reconcile_entities(vec![actor(1)], &[]).unwrap();
+    let observed = store.observe_entities().unwrap();
+    store.create_geometry(mesh()).unwrap();
+    store.commit();
+    let previous = Arc::clone(store.snapshot());
+    store.begin();
+    store.remove(observed[0].0).unwrap();
+    store.rollback();
+    assert!(Arc::ptr_eq(&previous, store.snapshot()));
+    store.begin();
+    store.remove(observed[0].0).unwrap();
+    store.commit();
+    assert!(store.snapshot().entities.is_empty());
+    assert_eq!(
+        store.remove(observed[0].0).unwrap_err().code,
+        ErrorCode::StaleHandle
+    );
+    store.begin();
+    assert_ne!(store.observe_entities().unwrap()[0].0, observed[0].0);
 }
