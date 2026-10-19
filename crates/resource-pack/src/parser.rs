@@ -15,8 +15,7 @@ use uuid::Uuid;
 use zip::{CompressionMethod, ZipArchive};
 
 use crate::{
-    AdmissionError, MAX_DECLARED_BYTES_PER_PACK, MAX_ENTRIES_PER_PACK, MAX_FILE_BYTES,
-    MAX_MANIFEST_BYTES, MAX_PATH_BYTES,
+    AdmissionError, MAX_DECLARED_BYTES_PER_PACK, MAX_ENTRIES_PER_PACK,
     crypto::{ContentKey, contents_file_keys},
     manifest::read_manifest,
     pack::{ArchiveBytes, EntryIndex, ValidatedPack, read_entry},
@@ -76,10 +75,13 @@ pub(super) fn validate_stack(
         }
     }
     packs.reverse();
-    ValidatedPackStack {
+    let stack = ValidatedPackStack {
         packs: packs.into_boxed_slice(),
         rejections: rejections.into_boxed_slice(),
-    }
+        fingerprint: Default::default(),
+    };
+    let _ = stack.fingerprint();
+    stack
 }
 
 #[cfg(feature = "handoff")]
@@ -175,8 +177,7 @@ pub(crate) fn validate_archive_parts_cached(
             && matches!(
                 file.compression(),
                 CompressionMethod::Stored | CompressionMethod::Deflated
-            )
-            && file.size() <= MAX_FILE_BYTES;
+            );
         match path {
             Some(path) if usable && folded_seen.insert(path.to_ascii_lowercase()) => {
                 let entry = EntryIndex {
@@ -213,6 +214,7 @@ pub(crate) fn validate_archive_parts_cached(
         archive_bytes,
         declared_bytes: declared,
         zip,
+        content_hash: Arc::default(),
         reads,
         files: rooted,
         folded: HashMap::new(),
@@ -222,11 +224,7 @@ pub(crate) fn validate_archive_parts_cached(
         skipped_entries: skipped,
     };
     let manifest_bytes = pack
-        .read_file_with_limit(manifest_path, MAX_MANIFEST_BYTES as u64)
-        .map_err(|error| match error {
-            AdmissionError::FileTooLarge => AdmissionError::ManifestTooLarge,
-            other => other,
-        })?
+        .read_file(manifest_path)?
         .ok_or(AdmissionError::MissingManifest)?;
     let manifest = read_manifest(&manifest_bytes, pack_id, version)?;
     let selected = if let Some(memory) = memory {
@@ -374,7 +372,7 @@ pub(crate) fn is_regular_file(mode: Option<u32>) -> bool {
 /// Normalizes separators and a leading `./`; paths that could escape the pack
 /// root or carry control characters are refused.
 pub(crate) fn canonical_path(raw: &[u8]) -> Option<Box<str>> {
-    if raw.is_empty() || raw.len() > MAX_PATH_BYTES || raw.contains(&0) {
+    if raw.is_empty() || raw.contains(&0) {
         return None;
     }
     let path = std::str::from_utf8(raw).ok()?.replace('\\', "/");

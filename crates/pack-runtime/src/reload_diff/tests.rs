@@ -5,6 +5,9 @@ use std::{
 };
 use zip::{ZipWriter, write::SimpleFileOptions};
 
+#[path = "tests/contents.rs"]
+mod contents;
+
 /// Previously admitted inputs used by the subscriber comparison tests.
 struct Previous {
     admission: PackAdmission,
@@ -23,6 +26,84 @@ impl Default for Previous {
 /// Builds synthetic UI layers without external pack assets.
 fn stack(files: &[(&str, &[u8])]) -> Arc<ValidatedPackStack> {
     crate::test_support::stack(files)
+}
+
+#[test]
+fn uncompiled_subscribers_skip_unused_file_reads() {
+    let source = stack(&[("extras/unused.bin", b"unused payload")]);
+    let previous = Previous {
+        admission: PackAdmission::Validated(source.clone()),
+        ..Default::default()
+    };
+    let changes = Changes::between(&source, Some((&previous.admission, &previous.dependencies)));
+    assert_eq!(
+        resource_pack::test_support::file_read_count(&source.packs()[0], "extras/unused.bin"),
+        Some(0)
+    );
+    assert_eq!(changes, Changes::all());
+}
+
+#[test]
+fn identical_stacks_reuse_recorded_subscribers_without_reads() {
+    let files: &[(&str, &[u8])] = &[("textures/unused.bin", b"unused payload")];
+    let before = stack(files);
+    let after = stack(files);
+    let previous = Previous {
+        admission: PackAdmission::Validated(before.clone()),
+        dependencies: [(
+            Subscriber::Ui,
+            BTreeSet::from([PackDependency::Contents("textures/".into())]),
+        )]
+        .into_iter()
+        .collect(),
+    };
+    let changes = Changes::between(&after, Some((&previous.admission, &previous.dependencies)));
+    assert!(!changes.ui);
+    assert!(changes.atmosphere && changes.entities);
+    for source in [&before, &after] {
+        assert_eq!(
+            resource_pack::test_support::file_read_count(&source.packs()[0], "textures/unused.bin"),
+            Some(0)
+        );
+    }
+}
+
+#[test]
+fn changed_blocks_skip_icon_comparison_reads() {
+    let before = stack(&[
+        ("blocks.json", b"old blocks"),
+        ("textures/icon.bin", b"old icon"),
+    ]);
+    let after = stack(&[
+        ("blocks.json", b"new blocks"),
+        ("textures/icon.bin", b"new icon"),
+    ]);
+    let previous = Previous {
+        admission: PackAdmission::Validated(before.clone()),
+        dependencies: [
+            (Subscriber::Blocks, "blocks.json"),
+            (Subscriber::Icons, "textures/icon.bin"),
+        ]
+        .into_iter()
+        .map(|(subscriber, path)| {
+            (
+                subscriber,
+                BTreeSet::from([PackDependency::File {
+                    path: path.into(),
+                    limit: resource_pack::MAX_FILE_BYTES,
+                }]),
+            )
+        })
+        .collect(),
+    };
+    let changes = Changes::between(&after, Some((&previous.admission, &previous.dependencies)));
+    assert!(changes.blocks && changes.icons);
+    for source in [&before, &after] {
+        assert_eq!(
+            resource_pack::test_support::file_read_count(&source.packs()[0], "textures/icon.bin"),
+            Some(0)
+        );
+    }
 }
 
 #[test]
@@ -97,6 +178,18 @@ fn control_text(stack: &ValidatedPackStack) -> String {
         .to_owned()
 }
 
+/// Records the per-layer UI namespace consumed by the control fixtures.
+fn ui_previous(stack: Arc<ValidatedPackStack>) -> Previous {
+    let mut dependencies = Dependencies::default();
+    compile(Subscriber::Ui, &stack, &mut dependencies, |view| {
+        view.track_contents("ui/");
+    });
+    Previous {
+        admission: PackAdmission::Validated(stack),
+        dependencies,
+    }
+}
+
 #[test]
 fn layer_boundaries_invalidate_ui_when_per_pack_ui_defs_change_effective_order() {
     let defs = br#"{"ui_defs":["ui/b.json","ui/a.json"]}"#;
@@ -112,10 +205,7 @@ fn layer_boundaries_invalidate_ui_when_per_pack_ui_defs_change_effective_order()
     let split = ValidatedPackStack::compose(&lower, &higher).unwrap();
     assert_eq!(control_text(&together), "b");
     assert_eq!(control_text(&split), "a");
-    let previous = Previous {
-        admission: PackAdmission::Validated(together),
-        ..Default::default()
-    };
+    let previous = ui_previous(together);
     assert!(Changes::between(&split, Some((&previous.admission, &previous.dependencies))).ui);
 }
 
@@ -124,10 +214,7 @@ fn empty_layers_leave_subscriber_fingerprints_unchanged() {
     let source = stack(&[("ui/test.json", b"{}")]);
     let empty = stack(&[]);
     let together = ValidatedPackStack::compose(&source, &empty).unwrap();
-    let previous = Previous {
-        admission: PackAdmission::Validated(source),
-        ..Default::default()
-    };
+    let previous = ui_previous(source);
     assert!(
         !Changes::between(
             &together,
@@ -167,10 +254,7 @@ fn selected_subpack_logical_content_changes_the_fingerprint() {
     };
     let root = admit("");
     let high = admit("high");
-    let previous = Previous {
-        admission: PackAdmission::Validated(root),
-        ..Default::default()
-    };
+    let previous = ui_previous(root);
     assert!(Changes::between(&high, Some((&previous.admission, &previous.dependencies))).ui);
 }
 
@@ -390,6 +474,6 @@ fn compile_part_reuses_unchanged_output_and_skips_cancelled_work() {
     assert_eq!(output, 3);
     assert!(inputs.unwrap().contains(&PackDependency::File {
         path: "texts/en_US.lang".into(),
-        limit: resource_pack::MAX_FILE_BYTES,
+        limit: u64::MAX,
     }));
 }

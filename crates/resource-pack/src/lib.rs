@@ -11,8 +11,10 @@ use std::sync::Arc;
 use protocol::ResourcePackHandoff;
 use thiserror::Error;
 
+mod added;
 mod crypto;
 mod dependencies;
+mod fingerprint;
 mod import;
 mod library;
 mod manifest;
@@ -25,7 +27,9 @@ pub mod subpacks;
 pub mod test_support;
 mod view;
 
+pub use added::{AddedPack, compose_added_packs};
 pub use dependencies::{PackDependencies, PackDependency};
+pub use fingerprint::StackFingerprint;
 pub use import::{
     GlobalSelectionEntry, PACK_IMPORT_EXTENSIONS, ParsedGlobalSelection, PreparedImport,
     is_pack_import_path, merge_global_selection, parse_global_selection, prepare_import,
@@ -47,10 +51,13 @@ pub const MAX_PACKS: usize = 32;
 pub const MAX_ARCHIVE_BYTES: usize = 64 * 1024 * 1024;
 /// Maximum compressed archive bytes accepted in one local import.
 pub const MAX_STACK_ARCHIVE_BYTES: usize = 128 * 1024 * 1024;
+/// Explicit read allowance for local import metadata and skin manifests.
 pub const MAX_MANIFEST_BYTES: usize = 256 * 1024;
+/// Explicit name allowance for stored global selections and local skin import.
 pub const MAX_PATH_BYTES: usize = 512;
 pub const MAX_ENTRIES_PER_PACK: usize = 32_768;
 pub const MAX_ENTRIES_PER_STACK: usize = 65_536;
+/// Explicit read allowance for local imports and bounded content subscribers.
 pub const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 pub const MAX_DECLARED_BYTES_PER_PACK: u64 = 512 * 1024 * 1024;
 pub const MAX_DECLARED_BYTES_PER_STACK: u64 = 1024 * 1024 * 1024;
@@ -121,7 +128,7 @@ impl From<zip_footer::FooterError> for AdmissionError {
     }
 }
 
-/// Admission result carried with StartGame. Dropped packs never fail the session.
+/// Admission result carried with StartGame, including per-pack rejection reasons.
 #[derive(Clone, Debug)]
 pub enum PackAdmission {
     None,

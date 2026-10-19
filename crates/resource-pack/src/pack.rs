@@ -3,7 +3,7 @@
 use std::{
     collections::HashMap,
     io::{Cursor, Read},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use uuid::Uuid;
@@ -12,7 +12,7 @@ use zip::{CompressionMethod, ZipArchive};
 use pack_json::parse_jsonc;
 
 use crate::{
-    AdmissionError, MAX_FILE_BYTES,
+    AdmissionError,
     crypto::ContentKey,
     read_cache::{CachedEntry, ReadCache},
 };
@@ -50,6 +50,7 @@ pub struct ValidatedPack {
     pub(crate) archive_bytes: usize,
     pub(crate) declared_bytes: u64,
     pub(crate) zip: PackZip,
+    pub(crate) content_hash: Arc<crate::fingerprint::ContentHash>,
     pub(crate) reads: Arc<ReadCache>,
     pub(crate) files: HashMap<Box<str>, EntryIndex>,
     pub(crate) folded: HashMap<Box<str>, Box<str>>,
@@ -92,7 +93,7 @@ impl ValidatedPack {
     }
 
     /// Entries dropped at admission (directories, unsafe or duplicate paths,
-    /// unsupported codecs, oversized files).
+    /// unsupported codecs).
     #[must_use]
     pub fn skipped_entries(&self) -> usize {
         self.skipped_entries
@@ -116,13 +117,13 @@ impl ValidatedPack {
         self.entry(path).map(|entry| entry.uncompressed_size)
     }
 
-    /// Reads one decrypted file from this pack only, with a hard uncompressed cap.
+    /// Reads one complete decrypted file from this pack, checking its declared size.
     pub fn read_file(&self, path: &str) -> Result<Option<Box<[u8]>>, AdmissionError> {
-        self.read_file_with_limit(path, MAX_FILE_BYTES)
+        self.read_file_with_limit(path, u64::MAX)
     }
 
     /// Compares pack identity, logical index and file keys without reading archive bytes.
-    /// Together with same_bytes, this guarantees identical reads, inflation and decryption.
+    /// Together with the archive digest, this preserves reads, inflation and decryption.
     fn same_index(&self, other: &Self) -> bool {
         /// Resolves an indexed entry's optional content key for semantic pack comparisons.
         fn key<'a>(pack: &'a ValidatedPack, entry: &EntryIndex) -> Option<&'a ContentKey> {
@@ -149,12 +150,6 @@ impl ValidatedPack {
                         }
                 })
             })
-    }
-
-    /// Whether both packs admitted identical archive bytes; shared bytes compare by address.
-    fn same_bytes(&self, other: &Self) -> bool {
-        let (ours, theirs) = (self.archive_bytes(), other.archive_bytes());
-        Arc::ptr_eq(&ours, &theirs) || ours == theirs
     }
 
     pub(crate) fn entry(&self, path: &str) -> Option<&EntryIndex> {
@@ -237,6 +232,7 @@ impl ValidatedPack {
     }
 }
 
+/// Reads an indexed member within the caller's allowance and checks its complete output.
 pub(crate) fn read_entry(
     zip: &PackZip,
     entry: &EntryIndex,
@@ -265,7 +261,10 @@ pub(crate) fn read_entry(
     }
     let capacity =
         usize::try_from(entry.uncompressed_size).map_err(|_| AdmissionError::FileTooLarge)?;
-    let mut bytes = Vec::with_capacity(capacity);
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(capacity)
+        .map_err(|_| AdmissionError::FileTooLarge)?;
     file.by_ref()
         .take(entry.uncompressed_size.saturating_add(1))
         .read_to_end(&mut bytes)
@@ -287,6 +286,7 @@ pub struct PackRejection {
 pub struct ValidatedPackStack {
     pub(crate) packs: Box<[ValidatedPack]>,
     pub(crate) rejections: Box<[PackRejection]>,
+    pub(crate) fingerprint: OnceLock<crate::StackFingerprint>,
 }
 
 impl std::fmt::Debug for ValidatedPackStack {
@@ -330,6 +330,7 @@ impl ValidatedPackStack {
         Ok(Self {
             packs: layers.cloned().collect(),
             rejections,
+            fingerprint: OnceLock::new(),
         })
     }
     /// Admitted layers, lowest precedence first.
@@ -338,21 +339,36 @@ impl ValidatedPackStack {
         &self.packs
     }
 
-    /// Compares layered reads and dropped packs, checking archive bytes after every layer index matches.
+    /// Returns the admission-time archive digests without hashing composed copies again.
+    #[must_use]
+    pub fn fingerprint(&self) -> &crate::StackFingerprint {
+        use rayon::prelude::*;
+        self.fingerprint.get_or_init(|| {
+            self.packs
+                .par_iter()
+                .map(|pack| {
+                    (
+                        pack.pack_id.to_string(),
+                        pack.version.to_string(),
+                        pack.sub_pack_name.to_string(),
+                        pack.content_hash.get(&pack.archive_bytes()),
+                    )
+                })
+                .collect()
+        })
+    }
+
+    /// Compares archive digests, layered reads and dropped packs without scanning archive bytes.
     #[must_use]
     pub fn same_contents(&self, other: &Self) -> bool {
         self.rejections == other.rejections
+            && self.fingerprint() == other.fingerprint()
             && self.packs.len() == other.packs.len()
             && self
                 .packs
                 .iter()
                 .zip(other.packs.iter())
                 .all(|(ours, theirs)| ours.same_index(theirs))
-            && self
-                .packs
-                .iter()
-                .zip(other.packs.iter())
-                .all(|(ours, theirs)| ours.same_bytes(theirs))
     }
 
     #[must_use]

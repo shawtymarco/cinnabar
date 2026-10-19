@@ -142,6 +142,9 @@ and resource qualification; they do not imply these systems need to be written.
 - [ ] `P2-CHUNK-PUBLICATION` — Qualify initial publication, steady streaming and full-view
   remesh against current frame/join/streaming budgets. Attribute decode, light readiness,
   queue wait, worker time, upload, submission and present latency independently.
+  Sparse startup can complete without a publisher update after terrain decodes, stream
+  and render work drain, and a later GPU frame completes. Empty-world initialization is
+  verified; complete server-form and gameplay acceptance remains open.
 - [ ] Close mesh-neighbour readiness acceptance with slow-delivery and seam coverage.
   Distinguish eligible horizontal columns from the provisional full-neighbour/quiet-time
   fallback; its timeout is not established native behavior.
@@ -255,6 +258,9 @@ across these existing features; they are not a list of missing screens or system
 - [ ] `P5.5-INTERACTION-COMBAT-INVENTORY` — Close targeting, mining/cracks, placement/use,
   combat, hotbar selection, stack/network-ID reconciliation and container/crafting
   prediction, acknowledgements, rollback and stale-session behavior.
+  Native block requirements now cover every catalog identifier, including no-tool
+  beds; recipe tags share the pinned native catalog. Sword/shears speed rules,
+  effective item durability and live mining acceptance remain incomplete.
 - [ ] `P5.6-FORMS` — Close modal/menu/custom form navigation, validation, cancellation
   and responses, including server-pack definitions, structured text, custom controls,
   scaling and image/layout behavior against matched native views.
@@ -299,10 +305,13 @@ preparation and presentation readiness remain required for a successful join. Li
 server latency impact and the complete transfer acceptance matrix remain unqualified.
 
 Server pack acquisition, handoff and stack composition no longer impose fixed archive-count
-or compressed-byte quotas. Saved server lists retain every imported entry. Declared sizes,
-identity, digests and framing remain validated. Experience selections preserve service errors
-and wait for the account core result. Complete featured-server acceptance remains open:
-large-pack preparation can be slow or fail, and sparse startup terrain can leave loading open.
+or compressed-byte quotas. Safe member paths have no added byte cutoff; server manifests
+and default member reads retain complete declared content. Explicit subscriber limits and
+large-content live and performance acceptance remain open. Saved server lists retain every
+imported entry. Declared sizes, identity, digests and framing remain validated. Experience
+selections preserve service errors and wait for the account core result. Complete
+featured-server, menu and gameplay qualification remains open, including large-pack
+preparation and broader sparse-startup coverage.
 Local imports, decompression, UI/text expansion, language memory and other admission limits
 still need version-matched verification; the limit inventory closes no whole-client parity gate.
 
