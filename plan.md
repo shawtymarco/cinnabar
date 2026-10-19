@@ -223,6 +223,11 @@ and rendered qualification, not initial implementation of those systems.
 - [ ] Close custom block-item texture resolution, non-cube shapes, tinting, animation
   and matched inventory/held-item presentation. Shared cube face sheets are bounded coverage.
 
+Continuous cosmetic cloth uses shared vertices, fixed-step constraints, world-space
+inertia and player-body contacts. Self-collision and world collision remain open.
+Paid cosmetic selections use session ownership from the API database and withdraw
+on disconnect or revocation; production rollout qualification remains open.
+
 Equipped cosmetic emitters also run in visible menu and HUD paper dolls using the
 shared particle engine and attachment poses. Catalog-wide, in-world interaction
 and performance qualification for these previews remains open.
@@ -305,9 +310,20 @@ preparation and presentation readiness remain required for a successful join. Li
 server latency impact and the complete transfer acceptance matrix remain unqualified.
 
 Server pack acquisition, handoff and stack composition no longer impose fixed archive-count
+or compressed-byte quotas. Saved server lists retain every imported entry. Declared sizes,
+identity, digests and framing remain validated. Experience selections preserve service errors
+and wait for the account core result. Complete featured-server acceptance remains open:
+large-pack preparation can be slow or fail, and sparse startup terrain can leave loading open.
+Server language loading retains every readable English and selected-locale layer without fixed
+table, entry or process quotas, and folds inserted keys to ASCII lowercase. Unreadable sources
+and allocation failures are diagnosed without discarding other definitions. Complete pack-content
+acceptance remains open. Local imports, decompression, UI/text expansion and other admission limits
 or compressed-byte quotas. Safe member paths have no added byte cutoff; server manifests
-and default member reads retain complete declared content. Explicit subscriber limits and
-large-content live and performance acceptance remain open. Saved server lists retain every
+and default member reads retain complete declared content. Manifest subpack lists have no separate
+row-count cutoff; server and local loading share the existing field validation and device-tier
+selection. Native runtime and device acceptance for larger subpack lists remain open.
+Explicit subscriber limits and large-content live and performance acceptance remain open.
+Saved server lists retain every
 imported entry. Declared sizes, identity, digests and framing remain validated. Experience
 selections preserve service errors and wait for the account core result. Complete
 featured-server, menu and gameplay qualification remains open, including large-pack
@@ -366,6 +382,10 @@ Use the current [live-testing guide](docs/agents/live-testing.md) as the single 
 reference hardware, frame/hitch, streaming, join and capture budgets. Capture the
 rendered result on the relevant platform and scale; distinguish hidden-window pixel
 coverage from displayed-frame pacing and OS input/focus evidence.
+
+Compiled entities, blocks and icons share a compressed disk cache. Hits restore dependency
+records; archive, session, startup artwork and device inputs invalidate affected entries.
+Hardware join and frame acceptance still needs the full capture matrix below.
 
 Check deterministic work in CI: bounded queues, invalidation, stale-work rejection,
 retained memory, allocations, uploads and unnecessary rebuilds. Measure release
