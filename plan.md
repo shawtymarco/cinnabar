@@ -220,6 +220,10 @@ and rendered qualification, not initial implementation of those systems.
 - [ ] Close custom block-item texture resolution, non-cube shapes, tinting, animation
   and matched inventory/held-item presentation. Shared cube face sheets are bounded coverage.
 
+Equipped cosmetic emitters also run in visible menu and HUD paper dolls using the
+shared particle engine and attachment poses. Catalog-wide, in-world interaction
+and performance qualification for these previews remains open.
+
 Remaining qualification includes attachables and custom item models, action/use timing,
 projectile interpolation and shake, sleep/mount poses, name tags (including over
 oversized server cosmetics), capes, shadows,
@@ -284,10 +288,23 @@ See [inventory ownership](docs/architecture/inventory.md),
 
 ## Phase 6 — Online product surface
 
-Online services are implemented; complete acceptance still covers authenticated
+Online services are implemented. Startup requires login facts and PlayerSpawn;
+radius replies remain ordered play updates without holding startup. Complete
+acceptance still covers authenticated
 server/Realm/friend-world joins, transfers, reconnect/disconnect, account switching,
 presence, invites and required-pack failures. Preserve transport/session identity
 and keep actual account details out of captures and reports published with PRs.
+Core transfer/disconnect terminals can abandon unfinished join preparation; ordinary
+preparation and presentation readiness remain required for a successful join. Live
+server latency impact and the complete transfer acceptance matrix remain unqualified.
+
+Server pack acquisition, handoff and stack composition no longer impose fixed archive-count
+or compressed-byte quotas. Saved server lists retain every imported entry. Declared sizes,
+identity, digests and framing remain validated. Experience selections preserve service errors
+and wait for the account core result. Complete featured-server acceptance remains open:
+large-pack preparation can be slow or fail, and sparse startup terrain can leave loading open.
+Local imports, decompression, UI/text expansion, language memory and other admission limits
+still need version-matched verification; the limit inventory closes no whole-client parity gate.
 
 Cosmetics require live authenticated multi-account acceptance, catalog/motion envelope
 coverage, supported slot/ownership enforcement, player-preview acceptance and hardware
