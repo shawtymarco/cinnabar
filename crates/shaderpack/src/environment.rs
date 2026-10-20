@@ -226,6 +226,9 @@ impl Environment {
         if self.distant_horizons {
             add("DISTANT_HORIZONS", String::new());
         }
+        d.extend(crate::biomes::biome_defines(
+            assets::facts::java_mapping::JavaBlockMapping::pinned().ok(),
+        ));
         d
     }
 }
