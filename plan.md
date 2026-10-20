@@ -259,6 +259,9 @@ Equipped cosmetic emitters also run in visible menu and HUD paper dolls using th
 shared particle engine and attachment poses. Catalog-wide, in-world interaction
 and performance qualification for these previews remains open.
 
+Player name tags use Java's standing player height before pose offsets, independent of
+server collision-box changes. Other actors retain their published label height.
+
 Remaining qualification includes attachables and custom item models, action/use timing,
 projectile interpolation and shake, sleep/mount poses, name tags (including over
 oversized server cosmetics), capes, shadows,
@@ -276,6 +279,9 @@ Implemented: [chat, HUD and scoreboard state](crates/ui/src/lib.rs),
 [inventory prediction and crafting](crates/inventory/src/lib.rs), and
 [menus and settings](crates/client-shell/src/menu.rs). The boxes track full acceptance
 across these existing features; they are not a list of missing screens or systems.
+Gameplay mouse capture resumes after focus or occlusion returns when it was active
+before switching away. Screen ownership and focus-loss input clearing remain in effect;
+OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
 
 - [ ] `P5.1-UI` — Close pack-driven UI, bounded text/draw work, formatting, scaling,
   safe areas, focus/navigation and keyboard/mouse/controller/touch acceptance. Prove
@@ -297,7 +303,14 @@ across these existing features; they are not a list of missing screens or system
   and responses, including server-pack definitions, structured text, custom controls,
   scaling and image/layout behavior against matched native views. Server settings
   replies are cached until their tab is selected; embedding their controls within
-  the settings panel instead of a separate form remains incomplete.
+  the settings panel instead of a separate form remains incomplete. URL images use
+  the UI texture-file allowance; aggregate encoded-image cache bounds and remaining
+  image admission and download-deadline parity remain incomplete.
+  scaling and image/layout behavior against matched native views. Custom forms
+  retain control locks and publish enabled bindings for the current game phase
+  without removing locked response values; device acceptance remains open. Server
+  settings replies are cached until their tab is selected; embedding their controls
+  within the settings panel instead of a separate form remains incomplete.
 - [ ] `P5.7-PARITY-PERF` — Qualify combined chat, scoreboard, boss bars, inventory and
   forms at supported scales/aspects and devices, with bounded memory and stable frame work.
 - [ ] `P5.8-SETTINGS` — Close menu, control, video and persistence acceptance. Desktop
@@ -399,8 +412,12 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   displayed-frame pacing and complete rendering acceptance.
 - Enhanced rendering remains restricted until its GPU faults and freezes are resolved.
   Diagnostics or bounded fixtures do not establish safe general gameplay use. Java
-  shader-pack source loading is implemented in `shaderpack`; configuration parsing,
-  translation, render-host integration and in-game acceptance remain incomplete.
+  shader-pack source loading and configuration metadata are implemented in
+  `shaderpack`, including options, dimensions, parsed properties, program discovery
+  and enable rules. Custom uniform expressions evaluate per frame, including numeric
+  operations and smoothing. Complete Iris type checking and target-dependent function
+  return overloads remain incomplete, as do translation, render-host integration and
+  in-game acceptance; evaluated custom uniforms are not uploaded or rendered.
 - `registryc --kind java-mapping` generates `crates/assets/data/java-mapping-v2193.bin` from
   the GeyserMC data pinned in `assets/geyser-mappings-source.json`: Java block states, block
   tags, biomes and their colours, entity types and items for every Bedrock id Geyser maps.
