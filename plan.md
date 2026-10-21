@@ -438,13 +438,19 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   blur, element blur, route exits and current-world visual integration remain incomplete.
 - Native extension UI and HUD APIs (retained modules, profile fields, text plates,
   compass markers, totem annotations and bounded camera overrides) still need
-  displayed-frame pacing and complete rendering acceptance. Panel previews now
+  displayed-frame pacing and complete rendering acceptance. Packet extensions now
+  negotiate bounded detached-view and passive camera effects through the shared
+  camera owners; interactive movement, perspective release, teleport and hurt-view
+  acceptance remain unverified in a displayed client. Panel previews now
   select owner-scoped HUD cards, including preview-only cards, and share retained
   gameplay artwork. Focused rendering and cache regressions cover visible previews;
   populated-world and displayed-frame acceptance remain pending.
   Personal panels and HUD editor surfaces can bind the host local player's name
   and skin head, with neutral artwork when the identity is unavailable. Skin and
   session changes retire the previous portrait; full in-world acceptance remains pending.
+  Embedded panel fonts admit covered Latin-1 and General Punctuation glyphs within
+  the existing atlas bounds. Active native fields retain an accent focus border;
+  focused regressions cover glyph fallback and steady-frame geometry reuse.
   populated-world and displayed-frame acceptance remain pending. Panel motion
   preferences now settle feedback, wheel scrolling and surface transitions
   immediately, retain prepared routes and apply across route changes.
@@ -453,13 +459,22 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   moves, resizes and nudges, with an additive anchored-layout read and normalized
   compatibility reads. Editor drags snap to neighboring cards, stacking gaps and
   host-supplied native HUD bounds, with edge distances and Shift snap bypass.
-  Displayed-frame pacing acceptance remains pending.
+  The editor also retains bounded undo/redo history, per-card draft visibility,
+  anchor and scale actions, live owner-scoped card updates and inspector bindings.
+  Hidden card IDs have an additive result read; toast and anchor motion use the
+  presentation clock. Displayed-frame pacing and populated-world Studio acceptance
+  remain pending.
   Backdrop and element blur now limit downsampling to referenced mip levels and
   cache the admitted maximum blur. Pixel-equivalence regressions are included;
   executed GPU checks and measured frame-budget acceptance remain pending.
   Server-day HUD rows now consume scoped native clock observations and leave missing
   or stale clocks unknown. Clock/host regressions are included; executed checks and
   populated-world acceptance remain pending.
+  acceptance remain unverified in a displayed client. Packet-extension world
+  drawing uses the retained geometry/depth owners, actor-mask compositor and
+  full-block highlight renderer. Headless camera, box/tracer and menu captures
+  exist; actor silhouettes, coloured full-block highlights and broad platform /
+  hardware-performance acceptance still require validation.
 - Enhanced rendering remains restricted until its GPU faults and freezes are resolved.
   Diagnostics or bounded fixtures do not establish safe general gameplay use. Java
   shader-pack source loading and configuration metadata are implemented in
@@ -468,6 +483,8 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   contract. Behind the render crate's `shaderpacks` feature, the host builds the Java-style
   block atlas packs sample. Pack-specific translation fixes, the rest of the render-host
   integration and in-game acceptance remain incomplete.
+  Autofocus intersects terrain model surfaces; sampling the rendered depth for cutout
+  pixels, liquid heights and entities remains incomplete.
   contract. Pack-specific translation fixes, render-host integration and in-game
   acceptance remain incomplete; parsed custom uniform expressions are not executed or
   rendered.

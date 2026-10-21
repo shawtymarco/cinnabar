@@ -66,6 +66,13 @@ impl ModUi {
         modifiers: ui::mod_panel::FieldModifiers,
     ) -> Vec<Event> {
         if self.mod_hud_editor_open() {
+            if !matches!(key, "Escape" | "Enter" | "NumpadEnter") {
+                self.mod_hud_editor
+                    .as_mut()
+                    .expect("open editor")
+                    .key_with_modifiers(key, modifiers);
+                return Vec::new();
+            }
             return self.mod_panel_key(key, text);
         }
         self.mod_panel
@@ -662,11 +669,7 @@ pub(super) fn append_overlay(
             let y = (rect[1] + (rect[3] - height) * 0.5).clamp(4., viewport[1] - height - 4.);
             let mut raised = palette;
             raised.card = palette.raised;
-            raised.border = if *invalid {
-                palette.accent
-            } else {
-                palette.text
-            };
+            raised.border = palette.accent;
             let mut field = chrome([width, height], raised, 3.);
             field.push(named(
                 "value",
