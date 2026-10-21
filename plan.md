@@ -232,7 +232,7 @@ qualification remain open.
 
 Pure numeric Molang expressions use bound f32 lane programs with load fusion;
 mixed values and effects retain the generic evaluator, including exact budget tails.
-Full rig history and rendered qualification remain part of `P4.3-RIGS`.
+Full rig history and rendered qualification remain part of the rig item below.
 Body and custom-skin composition use shared parent-first programs and caller-owned
 output, including attachable root modes and legacy attacks. Alternate render
 geometries and skin layers retain recursive composition. Rendered and live
@@ -329,6 +329,11 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   Complex item-tag scripts and live custom-block mining acceptance remain incomplete.
   Sword/shears speed rules,
   effective item durability and live mining acceptance remain incomplete.
+  Trading screens admit server offers and support purchases with manually placed inputs.
+  Automatic ingredient filling, trader experience, restock and demand-price transitions,
+  classic preview rich tooltips, and full item/container acceptance across trading layouts
+  remain incomplete.
+  Block-item purchases await an authoritative result preview to retain its block identity.
 - [ ] `P5.6-FORMS` — Close modal/menu/custom form navigation, validation, cancellation
   and responses, including server-pack definitions, structured text, custom controls,
   scaling and image/layout behavior against matched native views. Overlapping requests
@@ -458,6 +463,13 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   preferences now settle feedback, wheel scrolling and surface transitions
   immediately, retain prepared routes and apply across route changes.
   displayed-frame pacing and complete rendering acceptance.
+  Saturation overlays prepare source outlines on image workers independently of GPU-sheet
+  capacity and area-filter them to the requested draw size. Paint skips pending sources,
+  unions small masks within the visible viewport and atlas allocation budget, and draws
+  ordinary prepared sprites. A small LRU reuses clamped source grids across GUI scales. Current and held-food
+  coverage share one mask. CPU/GPU regressions cover tint, cropping, unequal translucent
+  edges, independent shake, inversion and high-resolution minification; complete in-game
+  and platform acceptance remain pending.
   HUD layout editing stores nine anchors and GUI-pixel offsets after completed
   moves, resizes and nudges, with an additive anchored-layout read and normalized
   compatibility reads. Editor drags snap to neighboring cards, stacking gaps and
@@ -482,55 +494,31 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   exist; actor silhouettes, coloured full-block highlights and broad platform /
   hardware-performance acceptance still require validation.
 - Enhanced rendering remains restricted until its GPU faults and freezes are resolved.
-  Diagnostics or bounded fixtures do not establish safe general gameplay use. Java
-  shader-pack source loading and configuration metadata are implemented in
-  `shaderpack`, including options, dimensions, parsed properties, program discovery
-  and enable rules, and its programs translate to validated naga modules with a binding
-  contract. Behind the render crate's `shaderpacks` feature, the host builds the Java-style
-  block atlas packs sample. Pack-specific translation fixes, the rest of the render-host
-  integration and in-game acceptance remain incomplete. Geometry replacement retains the
-  native scene-copy path when celestial layers or effects without depth writes still need
-  native composition; their geometry-host composition is incomplete. Actor color masks,
-  multitexture materials, dissolve pairs, beacon beams and additive rays retain native scene
-  composition until the host supports their complete material contracts.
-  native composition; their geometry-host composition is incomplete.
-  native scene-copy path when celestial layers, effects without depth writes, or first-person
-  scenes with private depth attachments still need native composition; their geometry-host
-  composition is incomplete.
-  integration and in-game acceptance remain incomplete.
-  Autofocus intersects terrain model surfaces; sampling the rendered depth for cutout
-  pixels, liquid heights and entities remains incomplete.
-  contract. Pack-specific translation fixes, render-host integration and in-game
-  acceptance remain incomplete; parsed custom uniform expressions are not executed or
-  rendered.
-  and enable rules. Translation, render-host integration and in-game acceptance
-  remain incomplete; parsed custom uniform expressions are not executed or rendered.
-  Pack block, item and entity ids, Java biome values and Java sky and fog colours are
-  computed from the pinned Bedrock→Java mappings but not yet uploaded to shaders.
-  and enable rules, and custom uniform expressions evaluate per frame. Translation,
-  render-host integration and in-game acceptance remain incomplete; evaluated custom
-  uniforms are not uploaded or rendered.
-  rendered. Constant folding for half-float packing and bit casts remains incomplete.
-  acceptance remain incomplete.
-  and enable rules. Translation, render-host integration and in-game acceptance
-  remain incomplete.
-  shader-pack source loading is implemented in `shaderpack`; configuration parsing,
-  translation, render-host integration and in-game acceptance remain incomplete.
-  remain incomplete; parsed custom uniform expressions are not executed or rendered.
-  Pack block, item and entity ids, Java biome values and Java sky and fog colours are
-  computed from the pinned Bedrock→Java mappings but not yet uploaded to shaders.
-  Sky/fog time curves and sunrise colours remain provisional; lightning, status effects,
-  underwater colour easing and the water-vision ramp are not implemented.
-  and enable rules. Custom uniform expressions evaluate per frame, including numeric
-  operations and smoothing. Complete Iris type checking and target-dependent function
-  return overloads remain incomplete, as do translation, render-host integration and
-  in-game acceptance; evaluated custom uniforms are not uploaded or rendered.
+  Diagnostics or bounded fixtures do not establish safe general gameplay use.
+- Java shader packs (Iris/OptiFine format) run behind the off-by-default `shaderpacks`
+  feature. `shaderpack` loads packs, parses `shaders.properties`, options, Iris option
+  menus, profiles and option files, evaluates custom uniforms and translates programs to
+  validated naga modules, with calls ordered after forward declarations and generated
+  helpers. The render host runs Iris's frame (shadow, gbuffers for terrain, actors, block
+  entities and the hand, deferred, composite and final passes, compute, custom textures and
+  images) plus the pack-drawn sky, particles, clouds, weather, lightning, cracks and selection.
+  Block, item, entity and biome ids and Java sky and fog colours come from the pinned
+  Bedrock→Java mappings. Settings offers pack import, a reload key, load status and a Shader
+  Pack Settings screen. Incomplete: in-game acceptance across packs and platforms (Metal is
+  unverified); stage pre-flips (`flip.<stage>_pre.<buffer>`) and Iris's explicit-flip
+  ordering; drawing the solid hand's glint before deferred passes; geometry-host composition
+  of celestial layers, effects without depth writes and private-depth first-person scenes,
+  which keep the native scene copy; actor colour masks, multitexture materials, dissolve
+  pairs, beacon beams and additive rays, which keep native composition; autofocus on cutout
+  pixels, liquids and entities; complete Iris type checking and target-dependent return
+  overloads; constant folding for half-float packing and bit casts. Java sky and fog time
+  curves and sunrise colours remain provisional.
 - `registryc --kind java-mapping` generates `crates/assets/data/java-mapping-v2193.bin` from
   the GeyserMC data pinned in `assets/geyser-mappings-source.json`: Java block states, block
   tags, biomes and their colours, entity types and items for every Bedrock id Geyser maps.
   States Geyser never produces take the closest same-block state and are flagged approximate;
-  Bedrock-only biomes and blocks stay unmapped. Nothing reads the carrier yet; Java shader
-  packs' ids, biome uniforms and sky colours are its first consumers.
+  Bedrock-only biomes and blocks stay unmapped. Java shader packs read it for their ids,
+  biome uniforms and sky colours.
 - Runtime pack compatibility still includes custom texture inheritance/tints, authored
   geometry and block/item component behavior beyond the currently supported cases.
 
