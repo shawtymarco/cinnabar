@@ -4,6 +4,8 @@
 //! variants), `final` into the screen, the copy-back (or exchange of textures) of buffers
 //! that end flipped, and the screen's presentation into the view.
 
+use super::draws::DrawKind;
+use super::effects::Effect;
 use super::frame_geometry::{
     FrameGeometry, bind_geometry, record_opaque, record_shadow, record_translucent,
 };
@@ -14,7 +16,7 @@ use super::uniforms::{
     DrawUniforms, FAR_PLANE_SCALE, FrameUniforms, GL_NEAR, HostValue, pack_block,
 };
 use crate::gpu_timing::{GpuTimestamps, within_stage};
-use bevy::math::Vec3;
+use bevy::math::{Mat4, Vec3};
 use render_scene::RuntimeStage;
 use shaderpack::{CustomUniforms, ProgramGroup};
 use std::collections::BTreeSet;
@@ -28,6 +30,26 @@ pub(crate) struct DrawContext {
     pub chunk_offset: Vec3,
     /// The block atlas's texel size (terrain draws' `atlasSize`).
     pub atlas_size: [i32; 2],
+    /// The particle atlas's texel size (particle draws' `atlasSize`).
+    pub particle_atlas_size: [i32; 2],
+    /// The first-person hand's projection, its depth scaled by `MC_HAND_DEPTH`.
+    pub hand_projection: Mat4,
+    /// The destroy-stage atlas size for damaged-block draws.
+    pub crack_atlas_size: [i32; 2],
+}
+
+impl DrawContext {
+    /// Returns the texel dimensions of the atlas bound to this draw.
+    pub(super) fn atlas_size(&self, kind: DrawKind) -> [i32; 2] {
+        match kind {
+            _ if kind.category().is_some() => self.atlas_size,
+            DrawKind::Effect(
+                Effect::Particles | Effect::ParticlesTranslucent | Effect::ParticlesAdditive,
+            ) => self.particle_atlas_size,
+            DrawKind::Effect(Effect::DamagedBlock) => self.crack_atlas_size,
+            _ => [0; 2],
+        }
+    }
 }
 
 /// Conversion planes and viewport rectangle uploaded to the host scene-copy shaders.
@@ -42,6 +64,8 @@ pub(crate) struct ViewState {
     pub(super) depth_parameters: wgpu::Buffer,
     scene_bindings: super::scene_bindings::SceneBindingCache,
     pub history: super::uniforms::UniformHistory,
+    /// Actor, block-entity and hand geometry skinned for the pack, with its draw bindings.
+    pub actors: super::actors::ViewActors,
     custom: CustomUniforms,
     scratch: Vec<u8>,
     unknown: BTreeSet<String>,
@@ -50,9 +74,11 @@ pub(crate) struct ViewState {
     audit: Option<super::uniform_audit::UniformAudit>,
     /// Programs and draws already reported as skipped.
     pub skipped: BTreeSet<String>,
-    /// The atlas generation the draw bind groups were built over (`None` inside: the
-    /// placeholder); `None` before the first frame.
-    pub atlas_generation: Option<Option<u64>>,
+    /// The atlas and effect texture generations the draw bind groups were built over
+    /// (`None` inside: placeholders); `None` before the first frame.
+    pub atlas_generation: Option<(Option<u64>, Option<u64>)>,
+    /// This frame's effect geometry.
+    pub effects: super::effects::EffectBuffers,
     /// Whether a frame has seen the player's biome: see [`Self::enter_world`].
     in_world: bool,
 }
@@ -96,6 +122,7 @@ impl ViewState {
             targets,
             bindings,
             history: Default::default(),
+            actors: Default::default(),
             custom,
             scratch: vec![],
             unknown: BTreeSet::new(),
@@ -103,6 +130,7 @@ impl ViewState {
             audit: super::uniform_audit::UniformAudit::from_env(),
             skipped: BTreeSet::new(),
             atlas_generation: None,
+            effects: Default::default(),
             in_world: false,
         })
     }
@@ -114,31 +142,48 @@ impl ViewState {
 
     /// Keeps native queues available when a geometry draw would reject its attachments.
     pub(crate) fn geometry_targets_ready(&self) -> bool {
-        self.pack.draws.iter().all(|draw| {
-            let shadow = self.pack.shadow.as_ref().filter(|_| draw.kind.shadow());
-            let mut size = draw.kind.depth().then(|| {
-                shadow.map_or(self.targets.screen_size, |shadow| {
-                    [shadow.slots.resolution; 2]
+        !self.actors.allocation_failed
+            && self.pack.draws.iter().all(|draw| {
+                let shadow = self.pack.shadow.as_ref().filter(|_| draw.kind.shadow());
+                let mut size = draw.kind.depth().then(|| {
+                    shadow.map_or(self.targets.screen_size, |shadow| {
+                        [shadow.slots.resolution; 2]
+                    })
+                });
+                draw.outputs.iter().flatten().all(|index| {
+                    let extent = if let Some(shadow) = shadow {
+                        shadow
+                            .slots
+                            .color
+                            .iter()
+                            .find(|(buffer, ..)| buffer == index)
+                            .map(|_| [shadow.slots.resolution; 2])
+                    } else {
+                        self.targets
+                            .buffers
+                            .get(*index as usize)
+                            .and_then(|buffer| buffer.as_ref())
+                            .map(|buffer| buffer.size)
+                    };
+                    extent.is_some_and(|extent| {
+                        super::frame_geometry::admit_extent(&mut size, extent)
+                    })
                 })
-            });
-            draw.outputs.iter().flatten().all(|index| {
-                let extent = if let Some(shadow) = shadow {
-                    shadow
-                        .slots
-                        .color
-                        .iter()
-                        .find(|(buffer, ..)| buffer == index)
-                        .map(|_| [shadow.slots.resolution; 2])
-                } else {
-                    self.targets
-                        .buffers
-                        .get(*index as usize)
-                        .and_then(|buffer| buffer.as_ref())
-                        .map(|buffer| buffer.size)
-                };
-                extent.is_some_and(|extent| super::frame_geometry::admit_extent(&mut size, extent))
             })
-        })
+    }
+
+    /// Refreshes atlas dimensions after native texture preparation and before recording draws.
+    pub(crate) fn sync_draw_atlas_sizes(&mut self, queue: &Queue, context: &DrawContext) {
+        for (draw, binding) in self.pack.draws.iter().zip(&mut self.bindings.draws) {
+            let Some(block) = &self.pack.programs[draw.program].reflection.uniforms else {
+                continue;
+            };
+            if binding.update_atlas_size(block, context.atlas_size(draw.kind))
+                && let Some(buffer) = &binding.uniforms
+            {
+                queue.write_buffer(buffer, 0, &binding.base);
+            }
+        }
     }
 
     /// Whether both the presentation pipeline and its view bindings support this format.
@@ -164,7 +209,7 @@ impl ViewState {
     }
 
     /// Evaluates custom uniforms and writes every program's and geometry draw's uniform
-    /// block.
+    /// block; each draw also keeps its packed bytes, which actor draws patch per actor.
     pub(crate) fn write_uniforms(
         &mut self,
         queue: &Queue,
@@ -221,7 +266,7 @@ impl ViewState {
                 audit.block(&format!("program {}", program.name), block, &lookup);
             }
         }
-        for (draw, binding) in self.pack.draws.iter().zip(&self.bindings.draws) {
+        for (draw, binding) in self.pack.draws.iter().zip(&mut self.bindings.draws) {
             let program = &self.pack.programs[draw.program];
             let (Some(block), Some(buffer)) = (&program.reflection.uniforms, &binding.uniforms)
             else {
@@ -229,10 +274,17 @@ impl ViewState {
             };
             let (model_view, projection) = if draw.kind.shadow() {
                 (frame.shadow_model_view(), frame.shadow_projection())
+            } else if draw.kind.hand() {
+                // Hand vertices are in view space already, as Iris draws them.
+                (Mat4::IDENTITY, context.hand_projection)
             } else {
                 (frame.model_view(), frame.projection())
             };
             let terrain = draw.kind.category().is_some();
+            let effect = match draw.kind {
+                DrawKind::Effect(effect) => Some(effect),
+                _ => None,
+            };
             let values = DrawUniforms {
                 model_view,
                 projection,
@@ -243,12 +295,14 @@ impl ViewState {
                 },
                 render_stage: draw.kind.render_stage(),
                 lightmap_matrix: draw.kind.lightmap_matrix(),
-                atlas_size: if terrain { context.atlas_size } else { [0; 2] },
-                entity_id: -1,
+                atlas_size: context.atlas_size(draw.kind),
+                entity_id: effect.map_or(-1, |effect| self.pack.effects.entity_id(effect)),
             };
             let lookup = |name: &str| values.value(name).or_else(|| lookup(name));
             pack_block(block, &lookup, &mut self.scratch, &mut self.unknown);
             queue.write_buffer(buffer, 0, &self.scratch);
+            binding.base.clone_from(&self.scratch);
+            binding.atlas_size = values.atlas_size;
             if let Some(audit) = &mut self.audit {
                 audit.block(
                     &format!("draw {:?} with {}", draw.kind, program.name),
@@ -398,6 +452,7 @@ pub(crate) fn record_frame(
     let timestamps = io.timestamps;
     if let Some(geometry) = geometry {
         bind_geometry(device, state, geometry);
+        super::actors::prepare(device, queue, encoder, state, &geometry.actors);
         within_stage(
             timestamps,
             RuntimeStage::GpuShaderpackShadow,
@@ -888,5 +943,29 @@ fn run_step(
             render.set_vertex_buffer(0, pack.quad.slice(..));
             render.draw(0..4, 0..1);
         }
+    }
+}
+
+#[cfg(test)]
+mod atlas_tests {
+    use super::*;
+    #[test]
+    fn damaged_blocks_use_the_atlas_bound_to_their_draw() {
+        let context = DrawContext {
+            chunk_offset: Vec3::ZERO,
+            atlas_size: [1024; 2],
+            particle_atlas_size: [512; 2],
+            crack_atlas_size: [256, 128],
+            hand_projection: Mat4::IDENTITY,
+        };
+        assert_eq!(
+            context.atlas_size(DrawKind::Effect(Effect::DamagedBlock)),
+            [256, 128]
+        );
+        assert_eq!(context.atlas_size(DrawKind::TerrainSolid), [1024; 2]);
+        assert_eq!(
+            context.atlas_size(DrawKind::Effect(Effect::Particles)),
+            [512; 2]
+        );
     }
 }

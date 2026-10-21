@@ -140,6 +140,7 @@ fn png_fixture(
         Fixture::Chat { .. }
         | Fixture::TabList(_)
         | Fixture::EditSelection
+        | Fixture::Toast { .. }
         | Fixture::BackupFont
         | Fixture::TiledImage { .. }
         | Fixture::ModPanel(..)
@@ -213,6 +214,25 @@ fn png_fixture(
                 selected,
                 &mut frame,
             )?;
+            add_server_pages(&mut engine, &mut carriers.pages);
+        }
+        Fixture::Toast { title, message } => {
+            let mut engine = json_engine(&carriers)?;
+            let shown = ui::ShownToast {
+                title: &title,
+                message: &message,
+                press: None,
+                started_millis: 0,
+                slide: 1.0,
+            };
+            frame.now = seconds;
+            ui_screens::toast_screen::paint(
+                &mut ui_engine::cached_screen::CachedScreen::default(),
+                &engine,
+                &shown,
+                &mut frame,
+            )
+            .map_err(|error| error.to_string())?;
             add_server_pages(&mut engine, &mut carriers.pages);
         }
         Fixture::HudEditor { hud, edited } => {

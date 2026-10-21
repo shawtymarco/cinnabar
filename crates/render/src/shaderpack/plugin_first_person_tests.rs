@@ -18,7 +18,7 @@ fn native_world() -> World {
 /// Reads the same extracted resources that control replacement and view uniforms.
 fn scene_needs_copy(world: &mut World) -> bool {
     world
-        .run_system_once(|native: NativeSceneLayers| native.needed())
+        .run_system_once(|native: NativeSceneLayers| native.first_person_native())
         .unwrap()
 }
 

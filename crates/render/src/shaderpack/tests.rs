@@ -5,6 +5,8 @@
     reason = "names missing GPU fixtures when tests skip"
 )]
 
+mod geometry_frames;
+
 use super::loader::{build, runnable_programs, translate_config};
 use super::passes::{FrameIo, ViewState, record_frame};
 use super::pipelines::GpuContext;
@@ -109,7 +111,12 @@ fn a_failed_required_program_fails_the_load() {
     ]);
     let translation = pack.translate(&translate_config(&pack, JAVA_DIMENSIONS[0]));
     let error = runnable_programs(&translation).expect_err("composite fails");
-    assert!(error.contains("composite"), "{error}");
+    let lines: Vec<&str> = error.lines().collect();
+    assert_eq!(lines.len(), 1, "one line per failed program: {error}");
+    assert!(
+        lines[0].starts_with("composite: composite.fsh:") && lines[0].contains("undefined_name"),
+        "names the program and its first diagnostic: {error}"
+    );
 }
 
 /// Switching packs shows Vanilla, which removes the block ids, between them; the geometry
@@ -129,7 +136,7 @@ fn the_next_packs_block_ids_never_reuse_a_revision() {
 }
 
 /// Requests only fixture features and fails if an available device cannot be created.
-fn gpu() -> Option<GpuContext> {
+pub(super) fn gpu() -> Option<GpuContext> {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
     let adapter = match bevy::tasks::block_on(instance.request_adapter(&Default::default())) {
         Ok(adapter) => adapter,
@@ -186,8 +193,10 @@ fn render_frame_options(
             &pack,
             "fixture",
             JAVA_DIMENSIONS[0],
+            &Default::default(),
             None,
             gpu,
+            &Default::default(),
             &Default::default(),
         )
         .expect("fixture loads"),
@@ -264,6 +273,9 @@ fn render_frame_options(
     let context = super::passes::DrawContext {
         chunk_offset: Vec3::ZERO,
         atlas_size: [0; 2],
+        particle_atlas_size: [0; 2],
+        hand_projection: bevy::math::Mat4::IDENTITY,
+        crack_atlas_size: [0; 2],
     };
     state.write_uniforms(&gpu.queue, &frame, 0.016, &context);
     let scope = gpu.device.push_error_scope(wgpu::ErrorFilter::Validation);
@@ -304,6 +316,27 @@ fn render_frame_options(
             device: &render_device,
             terrain: &terrain,
             atlas: None,
+            effect_textures: None,
+            actors: super::actors::ActorSources::default(),
+            effects: super::effects::EffectInputs {
+                camera: super::effects::EffectCamera {
+                    position: Vec3::new(0., 64., 0.),
+                    model_view: bevy::math::Mat4::IDENTITY,
+                    focal: [1.; 2],
+                    screen: [viewport[2], viewport[3]],
+                },
+                frame: game,
+                atmosphere: None,
+                atmosphere_view: None,
+                atmosphere_textures: None,
+                clouds_visible: false,
+                particles: None,
+                precipitation: None,
+                lightning: None,
+                selection: None,
+                block_entities: None,
+                seconds: 0.,
+            },
             sky: super::sky::SkyInputs {
                 sky_color: [0.; 3],
                 fog_color: [0.; 3],
@@ -739,6 +772,72 @@ fn programs_without_colour_outputs_load_and_keep_their_stores() {
     assert_pixels(&bytes, |_| [255, 0, 255]);
 }
 
+#[test]
+fn a_rejected_required_actor_pipeline_keeps_native_world_rendering() {
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::NOOP,
+        backend_options: wgpu::BackendOptions {
+            noop: wgpu::NoopBackendOptions {
+                enable: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..wgpu::InstanceDescriptor::new_without_display_handle()
+    });
+    let adapter = bevy::tasks::block_on(instance.request_adapter(&Default::default())).unwrap();
+    let (device, queue) =
+        bevy::tasks::block_on(adapter.request_device(&Default::default())).unwrap();
+    let gpu = GpuContext {
+        device,
+        queue,
+        adapter,
+    };
+    // Integer tangents cannot bind the actor vertex stream.
+    let pack = pack(&[
+        ("gbuffers_basic.vsh", PASS_VERTEX),
+        ("gbuffers_basic.fsh", FILL),
+        ("gbuffers_terrain.vsh", PASS_VERTEX),
+        ("gbuffers_terrain.fsh", FILL),
+        (
+            "gbuffers_entities.vsh",
+            "#version 130\nin ivec4 at_tangent; void main() { gl_Position = vec4(at_tangent); }",
+        ),
+        ("gbuffers_entities.fsh", FILL),
+    ]);
+    let pack = build(
+        &pack,
+        "fixture",
+        JAVA_DIMENSIONS[0],
+        &Default::default(),
+        None,
+        &gpu,
+        &Default::default(),
+        &Default::default(),
+    )
+    .expect("pipeline rejection retains the loaded pack and native scene");
+    let entities = pack
+        .programs
+        .iter()
+        .position(|p| p.name == "gbuffers_entities")
+        .expect("gbuffers_entities translated");
+    assert!(
+        super::actors::layout::vertex_layouts(&pack.programs[entities].reflection.vertex_inputs)
+            .is_err()
+    );
+    assert!(
+        pack.draws.is_empty(),
+        "a rejected required draw retains the native world path"
+    );
+    let kept: Vec<_> = pack
+        .draws
+        .iter()
+        .filter(|d| d.program == entities)
+        .map(|d| d.kind)
+        .collect();
+    assert!(kept.is_empty(), "rejected entities draws kept: {kept:?}");
+}
+
 /// BSL's hash argument `dot(p, vec2(12.9898, 4.1414))` at large `p`, scaled so the red
 /// channel resolves the last bits of the dot product.
 const HASH_DOT: &str = "#version 120
@@ -901,183 +1000,6 @@ impl super::frame_geometry::TerrainDraws for EmptyTerrain {
 }
 
 #[test]
-fn native_overlay_refreshes_pre_translucent_depth() {
-    let Some(gpu) = gpu() else {
-        eprintln!("missing fixture: native GPU adapter for the shader pack frame");
-        return;
-    };
-    let (_, bytes) = render_frame_options(
-        &gpu,
-        &[
-            ("gbuffers_terrain.vsh", PASS_VERTEX),
-            ("gbuffers_terrain.fsh", INVERT),
-            ("final.vsh", PASS_VERTEX),
-            (
-                "final.fsh",
-                "#version 120\nuniform sampler2D depthtex1; varying vec2 texcoord; void main() { gl_FragColor = vec4(vec3(texture2D(depthtex1, texcoord).r), 1.0); }",
-            ),
-        ],
-        1,
-        [0, 0, 4, 4],
-        false,
-        true,
-    );
-    assert_pixels(&bytes, |_| [191; 3]);
-}
-
-#[test]
-fn geometry_draws_refresh_custom_image_feedback_before_opening_the_pass() {
-    use super::frame_geometry::open_kind;
-    let Some(gpu) = gpu() else {
-        eprintln!("missing fixture: native GPU adapter for the shader pack frame");
-        return;
-    };
-    let source = pack(&[
-        (
-            "shaders.properties",
-            "image.marker = markerSampler RGBA RGBA8 UNSIGNED_BYTE true false 1 1\n",
-        ),
-        ("gbuffers_terrain.vsh", PASS_VERTEX),
-        (
-            "gbuffers_terrain.fsh",
-            "#version 430\nuniform image2D marker; uniform sampler2D markerSampler; void main() { vec4 c = texelFetch(markerSampler, ivec2(0), 0); imageStore(marker, ivec2(0), c); gl_FragData[0] = c; }",
-        ),
-    ]);
-    let pack = Arc::new(
-        build(
-            &source,
-            "fixture",
-            JAVA_DIMENSIONS[0],
-            None,
-            &gpu,
-            &Default::default(),
-        )
-        .unwrap(),
-    );
-    let mut state = ViewState::new(&gpu.device, Arc::clone(&pack), SIZE).unwrap();
-    let texture = &state.targets.images[0].0;
-    gpu.queue.write_texture(
-        texture.as_image_copy(),
-        &[255, 0, 0, 255],
-        wgpu::TexelCopyBufferLayout {
-            offset: 0,
-            bytes_per_row: Some(4),
-            rows_per_image: None,
-        },
-        texture.size(),
-    );
-    let mut encoder = gpu.device.create_command_encoder(&Default::default());
-    let depth = state.targets.geometry_depth.as_ref().unwrap().view.clone();
-    let extent = state.targets.screen_size;
-    drop(
-        open_kind(
-            &mut encoder,
-            &mut state,
-            super::draws::DrawKind::TerrainSolid,
-            0,
-            Some((&depth, extent)),
-        )
-        .unwrap(),
-    );
-    let source = &state.targets.image_snapshots[0].as_ref().unwrap().view;
-    let pipeline = &pack
-        .host
-        .present
-        .iter()
-        .find(|(f, _)| *f == render_scene::SCENE_COLOR_FORMAT)
-        .unwrap()
-        .1;
-    let group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout: &pipeline.get_bind_group_layout(0),
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: wgpu::BindingResource::TextureView(source),
-        }],
-    });
-    // Read the snapshot through a compatible color attachment, without requiring COPY_SRC on it.
-    let output = gpu.device.create_texture(&wgpu::TextureDescriptor {
-        label: None,
-        size: wgpu::Extent3d {
-            width: 1,
-            height: 1,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: render_scene::SCENE_COLOR_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
-    });
-    {
-        let view = output.create_view(&Default::default());
-        let mut pass = super::passes::pass(
-            &mut encoder,
-            "snapshot probe",
-            &[super::passes::load_attachment(&view)],
-            None,
-        );
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &group, &[]);
-        pass.draw(0..3, 0..1);
-    }
-    let readback = gpu.device.create_buffer(&wgpu::BufferDescriptor {
-        label: None,
-        size: 256,
-        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    encoder.copy_texture_to_buffer(
-        output.as_image_copy(),
-        wgpu::TexelCopyBufferInfo {
-            buffer: &readback,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(256),
-                rows_per_image: None,
-            },
-        },
-        output.size(),
-    );
-    gpu.queue.submit([encoder.finish()]);
-    readback
-        .slice(..)
-        .map_async(wgpu::MapMode::Read, |r| r.unwrap());
-    gpu.device
-        .poll(wgpu::PollType::wait_indefinitely())
-        .unwrap();
-    assert_eq!(
-        &readback.slice(..).get_mapped_range().unwrap()[..4],
-        &[255, 0, 0, 255]
-    );
-}
-
-#[test]
-fn geometry_overlay_crops_the_native_camera_viewport() {
-    let Some(gpu) = gpu() else {
-        eprintln!("missing fixture: native GPU adapter for the shader pack frame");
-        return;
-    };
-    let (_, bytes) = render_frame_options(
-        &gpu,
-        &[
-            ("gbuffers_basic.vsh", PASS_VERTEX),
-            ("gbuffers_basic.fsh", FILL),
-            ("gbuffers_terrain.vsh", PASS_VERTEX),
-            ("gbuffers_terrain.fsh", INVERT),
-            ("final.vsh", PASS_VERTEX),
-            ("final.fsh", FINAL),
-        ],
-        1,
-        [1, 0, 2, 2],
-        false,
-        true,
-    );
-    assert_pixels(&bytes, |row| if row < 2 { [255, 0, 0] } else { [128; 3] });
-}
-
-#[test]
 fn fixed_compute_dispatches_exceeding_device_limits_fail_loading() {
     let Some(gpu) = gpu() else { return };
     let count = gpu.device.limits().max_compute_workgroups_per_dimension + 1;
@@ -1089,8 +1011,10 @@ fn fixed_compute_dispatches_exceeding_device_limits_fail_loading() {
         &pack,
         "dispatch fixture",
         JAVA_DIMENSIONS[0],
+        &Default::default(),
         None,
         &gpu,
+        &Default::default(),
         &Default::default(),
     )
     .err()
@@ -1114,8 +1038,10 @@ fn relative_compute_dispatches_are_checked_for_each_view_size() {
             &pack,
             "dispatch fixture",
             JAVA_DIMENSIONS[0],
+            &Default::default(),
             None,
             &gpu,
+            &Default::default(),
             &Default::default(),
         )
         .unwrap(),

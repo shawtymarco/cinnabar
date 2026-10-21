@@ -3,7 +3,15 @@
 //! their standard uniforms. The renderer behind it compiles only with the `shaderpacks`
 //! feature; without it these types stay unused.
 
-use std::{collections::HashMap, fmt, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt,
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
 use bevy::{
     ecs::system::SystemParam,
@@ -11,17 +19,26 @@ use bevy::{
     render::{extract_component::ExtractComponent, extract_resource::ExtractResource},
 };
 
-/// The pack the settings ask for. The render host loads it on a worker whenever `pack`
-/// changes or is explicitly reselected, and reports progress through [`ShaderPackStatus`].
+/// The pack the settings ask for. The render host loads it on a worker whenever `pack` or
+/// `revision` changes and reports progress through [`ShaderPackStatus`].
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
 pub struct ShaderPackRequest {
     /// Pack folder or zip; `None` unloads the current pack.
     pub pack: Option<PathBuf>,
     /// Private directory for cached translations; `None` disables the cache.
     pub cache_dir: Option<PathBuf>,
-    /// Explicit menu selections reload even when the pack path is unchanged.
-    pub reload_generation: u64,
+    /// The pack's saved option values (Iris's `<pack>.txt` beside it), read on every load.
+    pub options: Option<PathBuf>,
+    /// Bumped to reload `pack` from disk. A reload of the shown pack keeps drawing it until
+    /// the reloaded pipelines are ready.
+    pub revision: u64,
 }
+
+/// The [`ShaderPackRequest::revision`] whose load last finished, ready or failed. Written by
+/// the render host so a reload can tell when its own load has settled, since reloading the
+/// shown pack leaves [`ShaderPackStatus`] at `Ready` throughout.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ShaderPackSettledRevision(pub u64);
 
 /// Load state of the requested pack, written by the render host.
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
@@ -33,7 +50,8 @@ pub enum ShaderPackStatus {
     Loading(PathBuf),
     /// The pack is translated and its programs are ready to bind.
     Ready(PathBuf),
-    /// The pack could not be used; cameras stay on Vanilla.
+    /// The pack could not be used; cameras stay on Vanilla. `reason` holds one problem per
+    /// line, the first summarising the failure.
     Failed { pack: PathBuf, reason: String },
 }
 
@@ -42,6 +60,66 @@ impl ShaderPackStatus {
     #[must_use]
     pub const fn is_ready(&self) -> bool {
         matches!(self, Self::Ready(_))
+    }
+}
+
+/// How far the load in progress has translated the pack's programs, shared with its worker.
+/// Each load starts a fresh counter, so a superseded worker never reports into the next one.
+#[derive(Resource, Clone, Debug, Default)]
+pub struct ShaderPackLoadProgress {
+    counter: Option<Arc<LoadProgress>>,
+    revision: u64,
+}
+
+impl ShaderPackLoadProgress {
+    /// Replaces the counter with a fresh one for a load that starts now.
+    pub fn start(&mut self) -> Arc<LoadProgress> {
+        self.revision = self.revision.wrapping_add(1);
+        Arc::clone(self.counter.insert(Arc::default()))
+    }
+
+    /// Identifies the latest started load, even when no loading frame was observed.
+    #[must_use]
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    /// Stops publishing a completed or cancelled load, leaving late worker updates detached.
+    pub fn finish(&mut self) {
+        self.counter = None;
+    }
+
+    /// Whether a load is running, including reloads that keep the previous pack drawing.
+    #[must_use]
+    pub fn is_loading(&self) -> bool {
+        self.counter.is_some()
+    }
+
+    /// `(translated, programs)` of the active load once it knows its program count.
+    #[must_use]
+    pub fn programs(&self) -> Option<(u32, u32)> {
+        self.counter.as_deref().and_then(LoadProgress::programs)
+    }
+}
+
+/// Programs translated out of the total, written by a load worker.
+#[derive(Debug, Default)]
+pub struct LoadProgress(AtomicU64);
+
+impl LoadProgress {
+    /// Records `translated` of `programs` done; both saturate at `u32::MAX`.
+    pub fn record(&self, translated: usize, programs: usize) {
+        let clamp = |count: usize| u64::from(u32::try_from(count).unwrap_or(u32::MAX));
+        self.0
+            .store(clamp(translated) << 32 | clamp(programs), Ordering::Relaxed);
+    }
+
+    /// `(translated, programs)`, or `None` before the program count is known.
+    #[must_use]
+    pub fn programs(&self) -> Option<(u32, u32)> {
+        let packed = self.0.load(Ordering::Relaxed);
+        let programs = packed as u32;
+        (programs > 0).then_some(((packed >> 32) as u32, programs))
     }
 }
 
@@ -55,14 +133,17 @@ pub struct ShaderPackRendering;
 /// lighter biomes beyond these are dropped.
 pub const SKY_BIOME_SLOTS: usize = 4;
 /// The Vanilla categories the loaded pack draws itself on [`ShaderPackRendering`] cameras.
-/// Written in the render world by the shader-pack host each frame; the Vanilla terrain and
-/// far-terrain passes skip those cameras for what is set, so the pack's Vanilla overlay never
-/// carries a second, Vanilla-lit copy.
+/// Written in the render world by the shader-pack host each frame; the Vanilla terrain,
+/// far-terrain, actor, block-entity and hand passes skip those cameras for what is set, so
+/// the pack's Vanilla overlay never carries a second, Vanilla-lit copy.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ShaderPackDrawnCategories {
     /// Terrain: a section the pack has not expanded yet shows nothing, as Iris draws no
     /// unbuilt section, rather than Vanilla-lit terrain or far-terrain tiles.
     pub terrain: bool,
+    pub actors: bool,
+    pub block_entities: bool,
+    pub hand: bool,
 }
 
 /// Which render-world views the pack draws a Vanilla category for, for the Vanilla
@@ -203,6 +284,39 @@ impl Default for ShaderPackFrameInputs {
     }
 }
 
+/// The effects the loaded pack draws itself on [`ShaderPackRendering`] cameras, through its
+/// own programs or not at all (`clouds=off`); the Vanilla renderers leave them out of those
+/// views. Written in the render world by the pack host.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ShaderPackEffects {
+    pub particles_opaque: bool,
+    pub particles_translucent: bool,
+    pub particles_additive: bool,
+    pub weather: bool,
+    pub lightning: bool,
+    pub clouds: bool,
+    /// The block selection outline.
+    pub selection: bool,
+    /// Block cracks; selection highlights follow `selection`.
+    pub cracks: bool,
+}
+
+/// Which render-world views the pack draws an effect for, for the Vanilla renderers' queue
+/// systems.
+#[derive(SystemParam)]
+pub struct ShaderPackDrawnEffects<'w, 's> {
+    effects: Option<Res<'w, ShaderPackEffects>>,
+    cameras: Query<'w, 's, (), With<ShaderPackRendering>>,
+}
+
+impl ShaderPackDrawnEffects<'_, '_> {
+    /// Whether the pack draws the effect `which` picks on render-world view `view`.
+    #[must_use]
+    pub fn replaces(&self, view: Entity, which: impl Fn(&ShaderPackEffects) -> bool) -> bool {
+        self.effects.as_deref().is_some_and(which) && self.cameras.contains(view)
+    }
+}
+
 /// Resolves a Bedrock identifier (`minecraft:ender_crystal`) to the loaded pack's id.
 pub type ShaderPackIdLookup = Arc<dyn Fn(&str) -> Option<i32> + Send + Sync>;
 
@@ -289,7 +403,10 @@ mod tests {
                 .unwrap()
         };
         assert_eq!(skips(&mut world), [false, false], "no pack loaded");
-        world.insert_resource(ShaderPackDrawnCategories { terrain: true });
+        world.insert_resource(ShaderPackDrawnCategories {
+            terrain: true,
+            ..Default::default()
+        });
         assert_eq!(skips(&mut world), [true, false]);
         world.insert_resource(ShaderPackDrawnCategories::default());
         assert_eq!(
@@ -297,5 +414,35 @@ mod tests {
             [false, false],
             "a pack without terrain keeps the Vanilla terrain it composites"
         );
+    }
+
+    #[test]
+    fn each_load_reports_its_own_program_progress() {
+        let mut progress = ShaderPackLoadProgress::default();
+        assert_eq!(progress.programs(), None, "nothing loading");
+        assert!(!progress.is_loading());
+        let first = progress.start();
+        assert!(progress.is_loading());
+        assert_eq!(progress.programs(), None, "program count not known yet");
+        first.record(0, 40);
+        first.record(12, 40);
+        assert_eq!(progress.programs(), Some((12, 40)));
+        let first_revision = progress.revision();
+        let second = progress.start();
+        assert_ne!(progress.revision(), first_revision);
+        let second_revision = progress.revision();
+        first.record(40, 40);
+        assert_eq!(
+            progress.programs(),
+            None,
+            "the superseded load reports elsewhere"
+        );
+        second.record(3, 7);
+        assert_eq!(progress.programs(), Some((3, 7)));
+        progress.finish();
+        assert_eq!(progress.revision(), second_revision);
+        second.record(7, 7);
+        assert!(!progress.is_loading());
+        assert_eq!(progress.programs(), None);
     }
 }

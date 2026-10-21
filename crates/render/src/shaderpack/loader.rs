@@ -6,7 +6,15 @@
 //! dominates the load, so the cache keeps the backend pipeline cache (Vulkan) in a private
 //! directory, keyed by the pack's content hash, the translation settings and the adapter.
 
+mod planning;
+
+use planning::{pack_settings, planned, storage_sizes};
+#[path = "load_diagnostics.rs"]
+mod diagnostics;
+use diagnostics::{failure_line, log_program};
+
 use super::draws::{GeometryDraw, GeometryStage, geometry_draws, select_draws};
+use super::effects::EffectSettings;
 use super::host_pipelines::{HostPipelines, host_pipelines};
 use super::pipeline_cache::PipelineCacheFile;
 use super::pipelines::{
@@ -25,11 +33,13 @@ use super::resources::{
 };
 use super::shadow_maps::{ShadowMaps, shadow_maps};
 use super::uniforms::PackSettings;
+use bevy::log::warn;
+use render_scene::shaderpack::LoadProgress;
 use sha2::{Digest, Sha256};
 use shaderpack::{
-    BlendMode, BufferId, CustomUniform, Environment, ProgramGroup, ProgramKind, ProgramReflection,
-    ProgramTranslation, SamplerBinding, SamplerClass, ScaleRule, ShaderPack, ShaderProperties,
-    StageKind, TranslateConfig,
+    CustomUniform, Environment, OptionValues, ProgramGroup, ProgramKind, ProgramReflection,
+    ProgramTranslation, SamplerBinding, SamplerClass, ScaleRule, ShaderPack, StageKind,
+    TranslateConfig,
 };
 use std::path::Path;
 use std::sync::Arc;
@@ -161,6 +171,8 @@ pub(crate) struct PackGpu {
     /// Pack-wide `lightmap` texture some geometry program samples; rewritten each frame the
     /// world lightmap changes.
     pub lightmap: Option<usize>,
+    /// The pack's effect directives (clouds, sun, moon, stars, weather, particle ordering).
+    pub effects: EffectSettings,
 }
 
 impl PackGpu {
@@ -184,40 +196,6 @@ fn runs(group: ProgramGroup) -> bool {
             | ProgramGroup::Composite
             | ProgramGroup::Final
     )
-}
-
-/// Groups the host draws or dispatches, whose diagnostics are warnings.
-fn drawn(group: ProgramGroup) -> bool {
-    runs(group)
-        || matches!(
-            group,
-            ProgramGroup::Gbuffers | ProgramGroup::Shadow | ProgramGroup::ShadowComposite
-        )
-}
-
-/// Logs a program's diagnostics; failures of programs this host runs are warnings.
-fn log_program(pack: &str, program: &ProgramTranslation) {
-    let required = program.enabled && drawn(program.program.group);
-    for diagnostic in program.all_diagnostics() {
-        let location = diagnostic
-            .location
-            .as_ref()
-            .map(|l| format!("{}:{}", l.file, l.line))
-            .unwrap_or_default();
-        if required {
-            bevy::log::warn!(
-                target: "cinnabar::shaderpack",
-                pack, program = %program.program.name, %location,
-                "{:?}: {}", diagnostic.phase, diagnostic.message
-            );
-        } else {
-            bevy::log::debug!(
-                target: "cinnabar::shaderpack",
-                pack, program = %program.program.name, %location,
-                "{:?}: {}", diagnostic.phase, diagnostic.message
-            );
-        }
-    }
 }
 
 /// The pack's content hash with the translation settings: the cache key.
@@ -256,127 +234,50 @@ pub(crate) fn translate_config(pack: &ShaderPack, dimension: &str) -> TranslateC
     }
 }
 
-/// Destination buffer per fragment output location.
-fn outputs_by_location(reflection: &ProgramReflection) -> Vec<Option<u32>> {
-    let len = reflection
-        .color_outputs
-        .iter()
-        .map(|o| o.location as usize + 1)
-        .max()
-        .unwrap_or(0);
-    let mut outputs = vec![None; len];
-    for output in &reflection.color_outputs {
-        outputs[output.location as usize] = output.buffer;
-    }
-    outputs
-}
-
-/// Whether some function of `module` can discard a fragment.
-fn discards(module: &naga::Module) -> bool {
-    fn kills(block: &naga::Block) -> bool {
-        block.iter().any(|statement| match statement {
-            naga::Statement::Kill => true,
-            naga::Statement::Block(inner) => kills(inner),
-            naga::Statement::If { accept, reject, .. } => kills(accept) || kills(reject),
-            naga::Statement::Switch { cases, .. } => cases.iter().any(|c| kills(&c.body)),
-            naga::Statement::Loop {
-                body, continuing, ..
-            } => kills(body) || kills(continuing),
-            _ => false,
-        })
-    }
-    module.functions.iter().any(|(_, f)| kills(&f.body))
-        || module.entry_points.iter().any(|e| kills(&e.function.body))
-}
-
-/// Plans one translated program, rejecting unsupported destinations before building masks.
-fn planned(
-    program: &ProgramTranslation,
-    reflection: &ProgramReflection,
-    properties: &ShaderProperties,
-) -> Result<PlannedProgram, String> {
-    let name = program.program.name.as_str();
-    let mipmaps = program
-        .consts
-        .iter()
-        .filter(|c| c.value.trim() == "true")
-        .filter_map(|c| c.name.strip_suffix("MipmapEnabled"))
-        .filter_map(|b| match BufferId::parse(b) {
-            Some(BufferId::Color(i)) if i < MAX_COLOR_BUFFERS => Some(i),
-            _ => None,
-        })
-        .collect();
-    let outputs = if reflection.kind == ProgramKind::Render {
-        outputs_by_location(reflection)
-    } else {
-        vec![]
-    };
-    if let Some(index) = outputs.iter().flatten().find(|&&b| b >= MAX_COLOR_BUFFERS) {
-        return Err(format!(
-            "{name} writes unsupported color buffer {index}; expected an index below {MAX_COLOR_BUFFERS}"
-        ));
-    }
-    let whole = properties.scales.iter().all(|s| s.program != name)
-        && !program
-            .stages
-            .iter()
-            .filter_map(|s| s.result.as_ref().ok())
-            .any(|c| c.stage == StageKind::Fragment && discards(&c.module));
-    let blends = |buffer: u32| {
-        let rule = |per_buffer: bool| {
-            properties.blends.iter().rev().find(|r| {
-                r.program == name
-                    && match r.buffer.as_deref() {
-                        Some(b) => per_buffer && color_buffer_of(b) == Some(buffer),
-                        None => !per_buffer,
-                    }
-            })
-        };
-        rule(true)
-            .or_else(|| rule(false))
-            .is_some_and(|r| r.mode != BlendMode::Off)
-    };
-    let partial = outputs
-        .iter()
-        .flatten()
-        .filter(|&&b| !whole || blends(b))
-        .fold(0u32, |mask, b| mask | (1 << b));
-    Ok(PlannedProgram {
-        name: name.to_owned(),
-        group: program.program.group,
-        kind: program.program.kind,
-        outputs,
-        reads: reflection
-            .textures
-            .iter()
-            .map(|t| t.name.as_str())
-            .chain(reflection.storage_images.iter().map(|i| i.name.as_str()))
-            .filter_map(color_buffer_of)
-            .collect(),
-        mipmaps,
-        partial,
-    })
-}
-
-/// Opens, translates and builds `path` for `dimension` (a Java dimension id); `vanilla`
-/// answers the pack's `minecraft:` texture references.
+/// Opens, translates and builds `path` for `dimension` (a Java dimension id) with the values
+/// saved in `options` (the pack's Iris option file, if any); `vanilla` answers the pack's
+/// `minecraft:` texture references. Saved values are normalized in memory; the option editor
+/// owns file writes so a load worker cannot overwrite a newer edit. Translation reports into
+/// `progress`.
 pub(crate) fn load(
     path: &Path,
+    options: Option<&Path>,
     dimension: &str,
     cache_dir: Option<&Path>,
     gpu: &GpuContext,
     vanilla: &VanillaTextures,
+    progress: &LoadProgress,
 ) -> Result<PackGpu, String> {
     let pack = ShaderPack::open(path).map_err(|e| e.to_string())?;
     let name = path.file_name().map_or_else(
         || path.display().to_string(),
         |n| n.to_string_lossy().into_owned(),
     );
-    build(&pack, &name, dimension, cache_dir, gpu, vanilla)
+    let values = options.map_or_else(OptionValues::new, |file| saved_options(&pack, file));
+    build(
+        &pack, &name, dimension, &values, cache_dir, gpu, vanilla, progress,
+    )
 }
 
-/// The enabled programs this host runs, in frame order, with their validated plans.
-/// An error names unsupported destinations or required programs that failed to translate.
+/// Reads and normalizes the pack's saved values without changing the file; unreadable files
+/// load the defaults.
+fn saved_options(pack: &ShaderPack, file: &Path) -> OptionValues {
+    let saved = match shaderpack::read_option_file(file) {
+        Ok(saved) => saved,
+        Err(error) => {
+            warn!(
+                target: "cinnabar::shaderpack",
+                file = %file.display(),
+                "shader pack options unreadable, using defaults: {error}"
+            );
+            return OptionValues::new();
+        }
+    };
+    shaderpack::normalize_values(pack.options(), &saved)
+}
+
+/// The enabled programs this host runs, in frame order, with validated destinations.
+/// Translation failures name each program and its first diagnostic.
 pub(crate) fn runnable_programs(
     translation: &shaderpack::PackTranslation,
 ) -> Result<(Vec<&ProgramTranslation>, Vec<PlannedProgram>), String> {
@@ -392,28 +293,40 @@ pub(crate) fn runnable_programs(
                 plans.push(planned(program, reflection, &translation.properties)?);
                 runnable.push(program);
             }
-            None => failed.push(program.program.name.clone()),
+            None => failed.push(failure_line(program)),
         }
     }
     if failed.is_empty() {
         Ok((runnable, plans))
     } else {
-        Err(format!("required programs failed: {}", failed.join(", ")))
+        Err(failed.join("\n"))
     }
 }
 
-/// Translates and builds an opened pack.
+/// Translates and builds an opened pack with option `values`; translation reports into
+/// `progress`.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the pack, its option values and the load's host inputs"
+)]
 pub(crate) fn build(
     pack: &ShaderPack,
     name: &str,
     dimension: &str,
+    values: &OptionValues,
     cache_dir: Option<&Path>,
     gpu: &GpuContext,
     vanilla: &VanillaTextures,
+    progress: &LoadProgress,
 ) -> Result<PackGpu, String> {
-    let config = translate_config(pack, dimension);
+    let config = TranslateConfig {
+        options: values.clone(),
+        ..translate_config(pack, dimension)
+    };
     let started = std::time::Instant::now();
-    let translation = pack.translate(&config);
+    let translation = pack.translate_reporting(&config, |translated, programs| {
+        progress.record(translated, programs);
+    });
     for diagnostic in &translation.properties.diagnostics {
         bevy::log::debug!(
             target: "cinnabar::shaderpack",
@@ -435,7 +348,17 @@ pub(crate) fn build(
     }
     let (block_ids, actor_ids) =
         super::ids::id_tables(pack.id_maps(&config.environment, &config.options), name);
-    let (geometry, selected_draws) = select_draws(&translation.programs);
+    let effects = EffectSettings::read(
+        &translation.properties,
+        runnable
+            .iter()
+            .any(|p| p.program.group == ProgramGroup::Deferred),
+        assets::facts::entity::NativeEntityClass::LightningBolt
+            .identifier()
+            .and_then(|lightning| actor_ids.entity_id(lightning)),
+    );
+    let (geometry, selected_draws) =
+        select_draws(&translation.programs, |kind| kind.drawn_by(&effects));
     let shadowcomp: Vec<&ProgramTranslation> = translation
         .programs
         .iter()
@@ -750,6 +673,7 @@ pub(crate) fn build(
             &geometry_stages,
             &programs,
             &translation.properties,
+            &effects,
             &buffer_formats,
             &shadow_slots,
         );
@@ -874,6 +798,7 @@ pub(crate) fn build(
             old_lighting: flag("oldLighting"),
             atlas_placeholder,
             lightmap,
+            effects,
         };
         Ok((loaded, pipeline_cache))
     });
@@ -893,94 +818,38 @@ pub(crate) fn build(
     Ok(loaded)
 }
 
-/// Storage bindings: the reflected minimum, raised to the pack's complete requested words.
-/// Resolves whole-buffer binding sizes, rejecting requests whose alignment would overflow.
-fn storage_sizes(
-    reflections: &[&ProgramReflection],
-    properties: &shaderpack::ShaderProperties,
-) -> Result<Vec<(u32, u64)>, String> {
-    let mut sizes: Vec<(u32, u64)> = vec![];
-    for buffer in reflections.iter().flat_map(|r| &r.storage_buffers) {
-        let declared = properties
-            .get(&format!("bufferObject.{}", buffer.binding))
-            .and_then(|v| v.split_whitespace().next()?.parse::<u64>().ok())
-            .unwrap_or(0);
-        let size = storage_binding_size(buffer.min_size, declared)
-            .map_err(|error| format!("storage binding {}: {error}", buffer.binding))?;
-        match sizes.iter_mut().find(|(b, _)| *b == buffer.binding) {
-            Some((_, s)) => *s = (*s).max(size),
-            None => sizes.push((buffer.binding, size)),
-        }
-    }
-    Ok(sizes)
-}
-
-/// Settings declared by the enabled programs in the pack.
-fn pack_settings(programs: &[ProgramTranslation]) -> PackSettings {
-    PackSettings::read(
-        programs
-            .iter()
-            .filter(|p| p.enabled)
-            .flat_map(|p| &p.consts),
-    )
-}
-
-/// Binding size in complete storage words, at least the reflected prefix.
-fn storage_binding_size(minimum: u32, declared: u64) -> Result<u64, String> {
-    let minimum = u64::from(minimum).max(4).next_multiple_of(4);
-    let size = minimum.max(declared);
-    let aligned = size.checked_next_multiple_of(4).ok_or("size overflows")?;
-    Ok(aligned - if size.is_multiple_of(4) { 0 } else { 4 })
-}
-
 #[cfg(test)]
 #[path = "loader_validation_tests.rs"]
 mod validation_tests;
 
 #[cfg(test)]
-mod tests {
+mod option_tests {
     use super::*;
 
-    /// A program with one pack-wide setting, independently of host execution support.
-    fn setting_program(group: ProgramGroup, enabled: bool, value: &str) -> ProgramTranslation {
-        ProgramTranslation {
-            program: shaderpack::ProgramSource {
-                name: String::new(),
-                group,
-                kind: ProgramKind::Render,
-                folder: String::new(),
-                stages: vec![],
-            },
-            enabled,
-            forced: vec![],
-            stages: vec![],
-            diagnostics: vec![],
-            reflection: None,
-            draw_buffers: vec![],
-            consts: vec![shaderpack::ConstDirective {
-                ty: "float".into(),
-                name: "sunPathRotation".into(),
-                value: value.into(),
-            }],
-        }
-    }
-
     #[test]
-    fn pack_settings_include_enabled_geometry_and_shadow_programs() {
-        let programs = [
-            setting_program(ProgramGroup::Gbuffers, true, "30.0"),
-            setting_program(ProgramGroup::Shadow, true, "45.0"),
-            setting_program(ProgramGroup::Composite, false, "90.0"),
-        ];
-        assert_eq!(pack_settings(&programs).sun_path_rotation, 45.0);
-    }
-
-    #[test]
-    fn storage_binding_lengths_keep_complete_declared_words() {
-        for declared in [20, 21, 23] {
-            assert_eq!(storage_binding_size(4, declared).unwrap(), 20);
-        }
-        assert_eq!(storage_binding_size(16, 4).unwrap(), 16);
-        assert!(storage_binding_size(4, u64::MAX).is_err());
+    fn loading_normalizes_options_without_writing_over_editor_saves() {
+        let pack = ShaderPack::new(shaderpack::PackSource::from_files([(
+            "final.fsh",
+            "#define QUALITY 2 // [1 2 3]\nvoid main() {}\n",
+        )]));
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("options.txt");
+        let saved = b"QUALITY=3\nREMOVED=true\n";
+        std::fs::write(&file, saved).unwrap();
+        assert_eq!(
+            saved_options(&pack, &file),
+            OptionValues::from([("QUALITY".into(), "3".into())])
+        );
+        assert_eq!(std::fs::read(&file).unwrap(), saved);
+        shaderpack::write_option_file(
+            &file,
+            pack.options(),
+            &OptionValues::from([("QUALITY".into(), "1".into())]),
+        )
+        .unwrap();
+        assert_eq!(
+            saved_options(&pack, &file),
+            OptionValues::from([("QUALITY".into(), "1".into())])
+        );
     }
 }

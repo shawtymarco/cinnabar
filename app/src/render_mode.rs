@@ -33,6 +33,8 @@ use {
 };
 
 pub(crate) mod authored_textures;
+#[cfg(feature = "shaderpacks")]
+mod shader_options;
 mod shader_pack;
 
 pub(crate) const RENDER_MODE_ENV: &str = "CINNABAR_RENDER_MODE";
@@ -180,6 +182,8 @@ struct RenderModeConfig {
     cli_shader_pack: Option<PathBuf>,
     /// Shader-pack folders, known once the menu supplies the install layout.
     shader_packs: Option<shader_pack::ShaderPackDirs>,
+    /// Bumped by each shader-pack reload; see [`ShaderPackRequest::revision`].
+    shader_pack_revision: u64,
 }
 
 impl Plugin for RenderModePlugin {
@@ -191,21 +195,35 @@ impl Plugin for RenderModePlugin {
                 path: None,
                 cli_shader_pack: self.shader_pack.clone(),
                 shader_packs: None,
+                shader_pack_revision: 0,
             })
             .init_resource::<ShaderPackRequest>()
+            .init_resource::<shader_pack::reload::ShaderPackReloadReport>()
             .add_systems(Startup, seed_render_mode)
             .add_systems(
                 Update,
                 (
                     shader_pack::refresh_shader_packs,
+                    shader_pack::reload::reload_on_key,
+                    shader_pack::reload::apply_reload,
                     apply_menu_render_mode,
                     shader_pack::sync_shader_pack_request,
+                    shader_pack::status::sync_shader_pack_status,
+                    shader_pack::reload::report_reload,
                     authored_textures::update_authored_textures,
                     apply_render_mode_to_cameras,
                     sync_enhanced_bloom,
                 )
                     .chain(),
             );
+        #[cfg(feature = "shaderpacks")]
+        app.init_resource::<shader_options::ShaderOptionsHost>()
+            .add_systems(
+                Update,
+                shader_options::drive_shader_options.after(apply_menu_render_mode),
+            );
+        #[cfg(feature = "shaderpacks")]
+        shader_pack::import::configure(app);
     }
 }
 
@@ -267,7 +285,6 @@ fn apply_menu_render_mode(
     mut config: ResMut<RenderModeConfig>,
     menu: Option<ResMut<MenuRuntime>>,
     mut settings: ResMut<RuntimeSettings>,
-    mut request: ResMut<ShaderPackRequest>,
 ) {
     let Some(mut menu) = menu else {
         return;
@@ -275,7 +292,7 @@ fn apply_menu_render_mode(
     let mode_request = menu.take_render_mode_request();
     let pack_request = menu.take_shader_pack_request();
     if pack_request.is_some() {
-        request.reload_generation = request.reload_generation.wrapping_add(1);
+        config.shader_pack_revision = config.shader_pack_revision.wrapping_add(1);
     }
     if mode_request.is_some() || pack_request.is_some() {
         if config.cli_shader_pack.is_some() {
@@ -296,7 +313,13 @@ fn apply_menu_render_mode(
     }
     let video = &settings.user_settings_update().1.video;
     menu.sync_render_mode(video.render_mode);
-    menu.sync_shader_pack(video.shader_pack.as_deref());
+    let requested = shader_pack::selected_pack(&config, video);
+    menu.sync_shader_pack(
+        requested
+            .as_ref()
+            .map(|pack| pack.name.as_str())
+            .or(video.shader_pack.as_deref()),
+    );
 }
 
 /// Original depth usage, restored once neither optional renderer samples the depth texture.

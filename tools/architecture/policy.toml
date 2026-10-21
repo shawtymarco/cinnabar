@@ -249,7 +249,7 @@ test_support_features = ["test-support"]
 name = "launcher"
 path = "crates/launcher"
 test_support_features = ["test-support"]
-allowed_dependencies = ["cosmetics", "assets", "bridge", "json-ui", "render-api", "resource-pack", "semantic-input", "ui", "update-manifest"]
+allowed_dependencies = ["cosmetics", "assets", "bridge", "json-ui", "render-api", "resource-pack", "semantic-input", "shaderpack", "ui", "update-manifest"]
 forbidden_dependencies = ["protocol", "server-experience"]
 forbidden_transitive_dependencies = ["app", "cinnabar", "client-ui", "player-state", "inventory", "client-world", "world", "sim", "render", "asset-compiler", "pack-compiler", "pack-compile-input", "pack-entity-compiler", "pack-font-compiler", "bevy", "bevy_*", "wgpu*"]
 
@@ -592,7 +592,7 @@ forbidden_dependencies = ["asset-compiler", "bevy", "wgpu"]
 [[crates]]
 name = "ui-snapshot"
 path = "tools/ui-snapshot"
-allowed_dependencies = ["client-ui", "cosmetics", "assets", "bridge", "inventory", "json-ui", "jsonui-editor", "launcher", "mod-ui", "resource-pack", "oreui", "player-state", "protocol", "render-api", "render-model", "ui", "ui-engine", "ui-screens"]
+allowed_dependencies = ["client-ui", "cosmetics", "assets", "bridge", "inventory", "json-ui", "jsonui-editor", "launcher", "mod-ui", "resource-pack", "oreui", "player-state", "protocol", "render-api", "render-model", "shaderpack", "ui", "ui-engine", "ui-screens"]
 test_support_features = ["test-support"]
 forbidden_transitive_dependencies = ["app", "cinnabar", "bevy", "bevy_*", "wgpu*"]
 
@@ -1399,6 +1399,21 @@ reason = "GLSL built-in function name in the custom-uniform expression language,
 path = "crates/shaderpack/src/custom_uniforms/compile.rs"
 literal = "sign"
 reason = "GLSL built-in function name in the custom-uniform expression language, not a game identifier."
+
+[[identifier_literal_exceptions]]
+path = "app/src/shader_pack_inputs.rs"
+literal = "minecraft:seagrass"
+reason = "Java Edition's water-filled blocks (Java gives them a water fluid state; Bedrock's registry has no such fact), meshed without water faces toward them only for shader packs."
+
+[[identifier_literal_exceptions]]
+path = "app/src/shader_pack_inputs.rs"
+literal = "minecraft:kelp"
+reason = "Java Edition's water-filled blocks (Java gives them a water fluid state; Bedrock's registry has no such fact), meshed without water faces toward them only for shader packs."
+
+[[identifier_literal_exceptions]]
+path = "app/src/shader_pack_inputs.rs"
+literal = "minecraft:bubble_column"
+reason = "Java Edition's water-filled blocks (Java gives them a water fluid state; Bedrock's registry has no such fact), meshed without water faces toward them only for shader packs."
 
 [[identifier_literal_exceptions]]
 path = "tools/devtool/src/web.rs"

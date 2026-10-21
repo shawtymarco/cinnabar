@@ -4,8 +4,8 @@
 
 use bevy::{
     prelude::{
-        App, DetectChangesMut, IntoScheduleConfigs, Plugin, Query, Res, ResMut, Resource, Time,
-        Transform, Update, Vec3, With,
+        App, DetectChangesMut, IntoScheduleConfigs, Local, Plugin, Query, Res, ResMut, Resource,
+        Time, Transform, Update, Vec3, With,
     },
     time::Real,
 };
@@ -21,8 +21,11 @@ use meshing::CameraMedium;
 use protocol::NetworkItemStack;
 use render_model::celestial;
 use render_scene::{
-    ActorRenderFrame, AtmosphereFrame, WorldLighting,
-    shaderpack::{SKY_BIOME_SLOTS, ShaderPackActorIds, ShaderPackFrameInputs, ShaderPackIdMaps},
+    ActorRenderFrame, AtmosphereFrame, ChunkRenderQueue, WorldLighting,
+    shaderpack::{
+        SKY_BIOME_SLOTS, ShaderPackActorIds, ShaderPackFrameInputs, ShaderPackIdMaps,
+        ShaderPackStatus,
+    },
 };
 
 use crate::{
@@ -72,8 +75,67 @@ impl Plugin for ShaderPackInputsPlugin {
                         .after(update_atmosphere_frame)
                         .after(LocalPlayerFrameSet::Interaction),
                     publish_actor_ids,
+                    mesh_like_java_for_shader_packs,
                 ),
             );
+    }
+}
+
+/// Bedrock blocks Java fills with water (`seagrass`, `kelp` and `kelp_plant`, `bubble_column`
+/// have a water fluid state), so Java draws no water faces toward them.
+const JAVA_WATER_FILLED: [&str; 3] = [
+    "minecraft:seagrass",
+    "minecraft:kelp",
+    "minecraft:bubble_column",
+];
+
+/// The water-filled network values last resolved, keyed by session and block-name revision.
+type ResolvedWaterFilled = ((u64, u64), std::sync::Arc<[u32]>);
+
+/// Meshes the way Java draws while a shader pack is loaded, as Iris renders it: leaves as
+/// Java's fancy leaves (every leaf cutout, none opaque) and no water faces toward the blocks
+/// Java fills with water; Bedrock's opaque deep leaves and water faces otherwise.
+fn mesh_like_java_for_shader_packs(
+    status: Option<Res<ShaderPackStatus>>,
+    mut client_world: ResMut<ClientWorld>,
+    mut resolved: Local<Option<ResolvedWaterFilled>>,
+    queue: Option<ResMut<ChunkRenderQueue>>,
+) {
+    let ready = status.as_deref().is_some_and(ShaderPackStatus::is_ready);
+    let Some(stream) = client_world.stream.as_ref() else {
+        return;
+    };
+    let wanted = ready.then(|| {
+        let authority = stream.authority();
+        // The name index fills in after join, and a new session brings new ids.
+        let key = (
+            authority.actor_session_id(),
+            authority.block_name_revision(),
+        );
+        match &*resolved {
+            Some((resolved_key, ids)) if *resolved_key == key => ids.clone(),
+            _ => {
+                let mut ids: Vec<u32> = JAVA_WATER_FILLED
+                    .iter()
+                    .flat_map(|name| authority.block_ids_for_name(name))
+                    .copied()
+                    .collect();
+                ids.sort_unstable();
+                ids.dedup();
+                let ids: std::sync::Arc<[u32]> = ids.into();
+                *resolved = Some((key, ids.clone()));
+                ids
+            }
+        }
+    });
+    // Borrowed mutably only on a change, so the world is not marked changed every frame.
+    if stream.java_meshing() != wanted.as_deref()
+        && let Some(stream) = client_world.stream.as_mut()
+    {
+        stream.set_java_meshing(wanted, web_time::Instant::now());
+        if let Some(mut queue) = queue {
+            queue.discard_resource_work();
+        }
     }
 }
 
@@ -413,6 +475,67 @@ fn fraction(current: u16, maximum: u16) -> Option<f32> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn java_meshing_toggle_discards_old_uploads_and_preserves_removals() {
+        use render_scene::{ChunkRenderQueue, ChunkUploadPriority};
+        let stream = WorldStream::new(protocol::WorldBootstrap {
+            local_player_unique_id: 1,
+            local_player_runtime_id: 1,
+            dimension: 0,
+            player_position: [0.0; 3],
+            world_spawn_position: [0; 3],
+            air_network_id: protocol_ids::SEQUENTIAL_AIR_NETWORK_ID,
+            block_network_ids_are_hashes: false,
+        });
+        let mut app = App::new();
+        app.insert_resource(ClientWorld {
+            stream: Some(stream),
+            ..Default::default()
+        })
+        .init_resource::<ChunkRenderQueue>()
+        .insert_resource(ShaderPackStatus::Ready("test".into()))
+        .add_systems(Update, mesh_like_java_for_shader_packs);
+        let upload = world::SubChunkKey::new(0, 0, 0, 0);
+        let removal = world::SubChunkKey { x: 1, ..upload };
+        for status in [
+            ShaderPackStatus::Ready("test".into()),
+            ShaderPackStatus::Idle,
+        ] {
+            app.insert_resource(status);
+            {
+                let mut queue = app.world_mut().resource_mut::<ChunkRenderQueue>();
+                queue
+                    .try_insert(
+                        upload,
+                        meshing::ChunkMesh::default(),
+                        ChunkUploadPriority::new(0.0),
+                    )
+                    .unwrap();
+                queue.try_remove(removal).unwrap();
+            }
+            app.update();
+            let queue = app.world().resource::<ChunkRenderQueue>();
+            assert!(queue.pending.is_empty());
+            assert_eq!(queue.pending_bytes, 0);
+            assert!(queue.removals.contains_key(&removal));
+        }
+        app.world_mut()
+            .resource_mut::<ChunkRenderQueue>()
+            .try_insert(
+                upload,
+                meshing::ChunkMesh::default(),
+                ChunkUploadPriority::new(0.0),
+            )
+            .unwrap();
+        app.update();
+        assert!(
+            app.world()
+                .resource::<ChunkRenderQueue>()
+                .pending
+                .contains_key(&upload)
+        );
+    }
+
     /// Builds two emissive states with distinct wire and store identities.
     fn held_light_stream(hashed: bool) -> WorldStream {
         use assets::*;
@@ -625,6 +748,50 @@ mod tests {
             sky_biomes([0.0; 3], |_| None)
                 .iter()
                 .all(|(_, w)| *w == 0.0)
+        );
+    }
+    #[test]
+    fn water_filled_inventory_conforms_to_the_pinned_java_mapping() {
+        use assets::facts::java_mapping::JavaBlockMapping;
+        use std::collections::BTreeSet;
+        let mapping = JavaBlockMapping::pinned().expect("the pinned Java mapping validates");
+        // A new mapping source requires reviewing this inventory's Java fluid-state policy.
+        assert_eq!(
+            mapping.payload().source_manifest_sha256,
+            [
+                0x7f, 0x7d, 0xa1, 0xd0, 0xfa, 0xa1, 0x4a, 0xc3, 0x3b, 0xc7, 0xb0, 0x02, 0xc2, 0xec,
+                0xfc, 0x89, 0xd9, 0x16, 0x4a, 0x4d, 0x8a, 0xc7, 0xad, 0x6d, 0xaf, 0xba, 0x6d, 0x00,
+                0x9a, 0x37, 0x92, 0x86
+            ],
+            "review the water-filled inventory for the new pinned Java mapping"
+        );
+        let records = assets::read_registry_for_protocol(
+            assets::pinned_block_registry_bytes(),
+            assets::active_content_registry_protocol(),
+        )
+        .unwrap();
+        let java_names = [
+            "minecraft:seagrass",
+            "minecraft:tall_seagrass",
+            "minecraft:kelp",
+            "minecraft:kelp_plant",
+            "minecraft:bubble_column",
+        ];
+        let expected: BTreeSet<_> = records
+            .iter()
+            .filter_map(|record| {
+                let java = mapping.java_block_state(record.sequential_id)?;
+                if !java_names.contains(&java.name()) {
+                    return None;
+                }
+                Some(record.name.as_ref())
+            })
+            .collect();
+        assert_eq!(
+            JAVA_WATER_FILLED.into_iter().collect::<BTreeSet<_>>(),
+            expected,
+            "water-filled inventory for Java {}",
+            assets::facts::java_mapping::java_edition()
         );
     }
 }

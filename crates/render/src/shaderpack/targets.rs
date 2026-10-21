@@ -624,8 +624,35 @@ fn pass_bind_entries<'a>(
 /// matrices and render stage) and bind groups.
 pub(crate) struct DrawBinding {
     pub uniforms: Option<wgpu::Buffer>,
+    /// This frame's packed uniform bytes, retained for later draw updates.
+    pub base: Vec<u8>,
+    /// Atlas dimensions represented by the retained uniform bytes.
+    pub atlas_size: [i32; 2],
     /// Per [`ViewTargets::parity`].
     pub groups: [Groups; 2],
+}
+
+impl DrawBinding {
+    /// Updates retained atlas dimensions without changing other frame or actor uniforms.
+    pub(crate) fn update_atlas_size(
+        &mut self,
+        block: &shaderpack::UniformBlock,
+        size: [i32; 2],
+    ) -> bool {
+        if self.atlas_size == size {
+            return false;
+        }
+        self.atlas_size = size;
+        super::uniforms::patch_block(
+            block,
+            &[(
+                "atlasSize",
+                super::uniforms::HostValue::IVec([size[0], size[1], 0, 0], 2),
+            )],
+            &mut self.base,
+        );
+        true
+    }
 }
 
 /// One mipmapped buffer side's downsample bind groups: one per level after the first,
@@ -664,7 +691,9 @@ pub(crate) fn draw_reads(pack: &PackGpu, draw: &GeometryDraw) -> BufferReads {
     let frame = &pack.frame;
     let (base, mips) = match draw.kind {
         kind if kind.shadow() => return BufferReads::default(),
-        kind if kind.after_deferred() => (frame.translucent_alt, frame.translucent_mips),
+        kind if kind.after_deferred(&pack.effects) => {
+            (frame.translucent_alt, frame.translucent_mips)
+        }
         _ => (frame.scene_alt, frame.scene_mips),
     };
     let program = &pack.programs[draw.program];
@@ -726,6 +755,8 @@ impl ViewBindings {
                     .map(|block| uniform_buffer(device, &program.name, block));
                 DrawBinding {
                     uniforms,
+                    base: vec![],
+                    atlas_size: [0; 2],
                     groups: Default::default(),
                 }
             })
@@ -757,8 +788,8 @@ impl ViewBindings {
         }
     }
 
-    /// Rebuilds every draw's bind groups over the block atlas `views` gives its kind (the
-    /// placeholder while `None`).
+    /// Rebuilds every draw's bind groups over the textures `views` gives its kind (the
+    /// placeholder while `None`): the block atlas for terrain, an effect's own texture.
     pub(crate) fn bind_draws<'a>(
         &mut self,
         device: &Device,
@@ -868,4 +899,45 @@ fn present_groups(
 /// Whether a program dispatches compute work.
 pub(crate) fn is_compute(pack: &PackGpu, step: &PassStep) -> bool {
     pack.programs[step.program].reflection.kind == ProgramKind::Compute
+}
+
+#[cfg(test)]
+mod atlas_tests {
+    use super::*;
+    #[test]
+    fn newly_prepared_atlases_refresh_retained_draw_uniforms() {
+        use shaderpack::{ScalarType, UniformBlock, UniformMember, ValueType};
+        let block = UniformBlock {
+            name: "draw".into(),
+            group: 0,
+            binding: 0,
+            stages: Default::default(),
+            size: 16,
+            members: vec![UniformMember {
+                name: "atlasSize".into(),
+                offset: 0,
+                ty: ValueType::Vector {
+                    size: 2,
+                    scalar: ScalarType::Int,
+                },
+                array: None,
+            }],
+        };
+        let mut binding = DrawBinding {
+            uniforms: None,
+            base: vec![0; 16],
+            atlas_size: [0; 2],
+            groups: Default::default(),
+        };
+        assert!(binding.update_atlas_size(&block, [256, 128]));
+        assert_eq!(
+            i32::from_le_bytes(binding.base[0..4].try_into().unwrap()),
+            256
+        );
+        assert_eq!(
+            i32::from_le_bytes(binding.base[4..8].try_into().unwrap()),
+            128
+        );
+        assert!(!binding.update_atlas_size(&block, [256, 128]));
+    }
 }

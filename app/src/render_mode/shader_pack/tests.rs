@@ -20,6 +20,7 @@ fn config(launch: Option<PathBuf>) -> RenderModeConfig {
             cache: cache(),
             discovered: vec![("Nested".to_owned(), packs().join("Nested").join("Inner"))],
         }),
+        shader_pack_revision: 0,
     }
 }
 
@@ -135,7 +136,10 @@ fn reselecting_a_failed_pack_requests_another_load() {
     {
         let mut menu = app.world_mut().resource_mut::<MenuRuntime>();
         menu.sync_shader_packs(vec!["Dusk.zip".to_owned()]);
-        menu.activate(MenuAction::SelectRenderer(RendererChoice::ShaderPack(0)));
+        let revision = menu.view().shader_packs_revision;
+        menu.activate(MenuAction::SelectRenderer(RendererChoice::ShaderPack(
+            0, revision,
+        )));
     }
     app.update();
     assert_eq!(requested(&app), Some(path));
@@ -168,7 +172,10 @@ fn a_menu_pick_replaces_the_launch_pack_and_saves_only_its_name() {
     {
         let mut menu = app.world_mut().resource_mut::<MenuRuntime>();
         menu.sync_shader_packs(vec!["Dusk.zip".to_owned()]);
-        menu.activate(MenuAction::SelectRenderer(RendererChoice::ShaderPack(0)));
+        let revision = menu.view().shader_packs_revision;
+        menu.activate(MenuAction::SelectRenderer(RendererChoice::ShaderPack(
+            0, revision,
+        )));
     }
     app.update();
     assert_eq!(requested(&app), Some(packs().join("Dusk.zip")));
