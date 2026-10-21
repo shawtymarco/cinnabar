@@ -200,6 +200,10 @@ is a broader claim than the presence of these features.
   Touch remains open even when an owner-deprioritized touch witness does not gate a
   narrower scenario verdict.
 
+View Bobbing offers Off, Full and Minimal. Minimal retains first-person hand bobbing
+with a steady movement camera in both animation modes; hurt and death effects remain
+independent. In-world rendered acceptance evidence for this client option remains outstanding.
+
 Historical movement acceptance scope includes sprint/double-tap/toggle timing, forced
 sneak/crawl, mode entry/exit, flight, swimming/gliding, liquid correction and scaffolding
 descent. Reconcile each case with current code and evidence before calling it a missing
@@ -251,9 +255,10 @@ performance qualification remains open.
   and matched inventory/held-item presentation. Shared cube face sheets are bounded coverage.
 
 Continuous cosmetic cloth uses shared vertices, fixed-step constraints, world-space
-inertia and player-body contacts with standard-armor clearance. Vertical follow and
-damping restrain jump and landing motion, and local cloth keeps advancing while
-first-person visibility hides the body. View changes transfer the drape between
+inertia and contacts derived from the drawn body and worn armor. Cloth pins and
+mounts retract toward the bare torso and expand to clear equipped chest geometry.
+Vertical follow and damping restrain jump and landing motion, and local cloth keeps
+advancing while first-person visibility hides the body. View changes transfer the drape between
 body pose spaces. Self-collision and world collision remain open.
 Paid cosmetic selections use session ownership from the API database and withdraw
 on disconnect or revocation; production rollout qualification remains open.
@@ -264,6 +269,20 @@ and performance qualification for these previews remains open.
 
 Player name tags use Java's standing player height before pose offsets, independent of
 server collision-box changes. Other actors retain their published label height.
+Name-tag budgets admit on-screen bounds before their caps, favor nearer labels and
+keep cosmetic labels complete. Atlas text
+retains formatting and line slots, with guarded cell edges and
+repacking before UV publication. In-world visual qualification remains open.
+Name tag colours compose after Enhanced and shader-pack world effects with the scene's
+depth, and translucent plates use over-compositing for scene alpha. Coplanar shadows
+and glyphs share the anchor depth to avoid rounding speckle. Local cosmetic
+colour selection uses actor identity. In-world visual qualification remains open.
+Upright player name tags keep Java's standing height before pose offsets; swimming,
+crawling and gliding players use their live height. Other actors retain their published
+label height. Tag eligibility uses always-show metadata or the shared crosshair pick.
+Camera distance controls server render limits and score range; passenger mounts keep
+their name without a score line. Depth testing honors sneaking and the nameplate flag.
+Matched rendered-frame qualification remains open.
 
 Remaining qualification includes attachables and custom item models, action/use timing,
 projectile interpolation and shake, sleep/mount poses, name tags (including over
@@ -351,6 +370,14 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
 - [ ] `P5.8-SETTINGS` — Close menu, control, video and persistence acceptance. Desktop
   wiring alone does not establish native parity; language-specific scale dialogs,
   safe-zone handling, service-controlled spacing and touch/console behavior remain open.
+  Social → Chat exposes the existing chat preferences, shared opacity, duration and
+  position controls, and one reset for all displayed Chat settings. Chat uses the bundled
+  Cinnangles Sans font without a typeface selector; font sizing applies directly and
+  obsolete saved typeface values are ignored. Emote filtering, narration and mention
+  highlighting remain unavailable and their controls say they store preferences only.
+  Offline rendered fixtures cover the panel, values, palettes and reset confirmation;
+  live input acceptance remains incomplete. Font size 5–20/default 10 and spacing
+  0–100/default 0 remain provisional host ranges, without confirmed native defaults.
 
 The inherited interaction acceptance scope also includes full item identity and use phases,
 replacement/deferred releases, mounted inventory, sign filtering/length/structured text,
@@ -495,6 +522,8 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   hardware-performance acceptance still require validation.
 - Enhanced rendering remains restricted until its GPU faults and freezes are resolved.
   Diagnostics or bounded fixtures do not establish safe general gameplay use.
+  Its MSAA nametag composite blends against resolved scene colour, so labels partly
+  occluded by world silhouettes get a dark edge fringe; per-sample composition is incomplete.
 - Java shader packs (Iris/OptiFine format) run behind the off-by-default `shaderpacks`
   feature. `shaderpack` loads packs, parses `shaders.properties`, options, Iris option
   menus, profiles and option files, evaluates custom uniforms and translates programs to
@@ -506,6 +535,15 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Bedrock→Java mappings. Settings offers pack import, a reload key, load status and a Shader
   Pack Settings screen. Incomplete: in-game acceptance across packs and platforms (Metal is
   unverified); stage pre-flips (`flip.<stage>_pre.<buffer>`) and Iris's explicit-flip
+  ordering; drawing the solid hand's glint before deferred passes; pack replacements
+  for uncovered celestial layers (the pack sky stands), actor colour masks, multitexture
+  materials, dissolve pairs, beacon beams and additive rays (these retain native
+  composition over the pack); native layers behind pack-rendered glass or water, whose
+  final depth can hide those layers; autofocus on cutout
+  Bedrock→Java mappings. The Shaders settings tab offers pack import, reload, load status
+  and a Shader Pack Settings screen. Video links to Shaders and shows its renderer switch
+  only when Enhanced is available.
+  Incomplete: in-game acceptance across packs and platforms (Metal is unverified); stage pre-flips (`flip.<stage>_pre.<buffer>`) and Iris's explicit-flip
   ordering; drawing the solid hand's glint before deferred passes; geometry-host composition
   of celestial layers, effects without depth writes and private-depth first-person scenes,
   which keep the native scene copy; actor colour masks, multitexture materials, dissolve

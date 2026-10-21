@@ -1,6 +1,7 @@
 //! Named, anonymous screen fixtures. Add a state here when a PR needs a new capture.
 
 mod chat;
+mod chat_settings;
 mod collection_reveal;
 #[cfg(feature = "test-support")]
 mod cosmetics;
@@ -125,7 +126,7 @@ const fn asset_free(name: &'static str, size: [u32; 2], fixture: fn() -> Fixture
     }
 }
 
-pub const STATES: &[State] = &[
+const STATES: &[State] = &[
     asset_free("sprite-outline-before", [800, 240], || {
         Fixture::SpriteOutline { outline: false }
     }),
@@ -742,19 +743,25 @@ pub const STATES: &[State] = &[
         name: "settings-video",
         size: SIZE,
         gui_scale: GUI_SCALE,
-        fixture: settings_video,
+        fixture: shader_pack::settings_video,
     },
     State {
-        name: "settings-video-shader-packs",
+        name: "settings-video-shader-shortcut",
         size: SIZE,
         gui_scale: GUI_SCALE,
-        fixture: shader_pack::video_picker,
+        fixture: shader_pack::video_shortcut,
+    },
+    State {
+        name: "settings-shaders",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: shader_pack::pack_picker,
     },
     State {
         name: "settings-storage",
         size: SIZE,
         gui_scale: GUI_SCALE,
-        fixture: settings_storage,
+        fixture: out_of_game::settings_storage,
     },
     State {
         name: "settings-keyboard",
@@ -869,10 +876,10 @@ pub const STATES: &[State] = &[
         fixture: mods::undeclared_permissions,
     },
     State {
-        name: "settings-video-shader-options-button",
+        name: "settings-shaders-options-button",
         size: SIZE,
         gui_scale: GUI_SCALE,
-        fixture: shader_options::renderer_row,
+        fixture: shader_options::options_button,
     },
     State {
         name: "settings-shader-options",
@@ -911,16 +918,16 @@ pub const STATES: &[State] = &[
         fixture: shader_pack::failed,
     },
     State {
-        name: "settings-video-shader-pack",
+        name: "settings-shaders-selected",
         size: SHADER_PACK_ROW_SIZE,
         gui_scale: GUI_SCALE,
-        fixture: || shader_pack::settings_video(false),
+        fixture: || shader_pack::settings_shaders(false),
     },
     State {
-        name: "settings-video-shader-pack-failed",
+        name: "settings-shaders-failed",
         size: SHADER_PACK_ROW_SIZE,
         gui_scale: GUI_SCALE,
-        fixture: || shader_pack::settings_video(true),
+        fixture: || shader_pack::settings_shaders(true),
     },
 ];
 
@@ -933,18 +940,6 @@ pub fn settings(section: &str) -> MenuView {
         .find_map(|(name, index)| (*name == section).then_some(*index))
         .expect("registered settings category");
     view
-}
-
-/// Shows an ordinary OreUI route without account, world or network services.
-fn settings_video() -> Fixture {
-    Fixture::Menu(Box::new(settings(SettingSection::Video.definition().name)))
-}
-
-/// Shows Storage as a desktop host fills it, with the folder buttons.
-fn settings_storage() -> Fixture {
-    let mut view = settings(SettingSection::StorageManagement.definition().name);
-    Arc::make_mut(&mut view.storage).opens_folders = true;
-    Fixture::Menu(Box::new(view))
 }
 
 /// Shows the keyboard options and command macro modifier without a live session.
@@ -995,4 +990,9 @@ fn settings_keyboard_layout(observed: bool) -> Fixture {
         settings.set_key_label(0x14, "a");
     }
     Fixture::Menu(Box::new(view))
+}
+
+/// Enumerates every fixture, including the Chat section's independently owned states.
+pub fn states() -> impl Iterator<Item = &'static State> {
+    STATES.iter().chain(chat_settings::STATES)
 }
