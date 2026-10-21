@@ -293,7 +293,8 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   Rounded JSON-UI chrome supports bounded analytic box shadows with cached geometry;
   full menu visual and hardware frame-work acceptance remains open.
   Client-owned panel collections support bounded four-column card grids with
-  item-scoped expressions and vector artwork; hardware frame-work acceptance remains open.
+  item-scoped expressions, vector artwork and one-time guest requests to reveal filtered
+  items without rebuilding the catalog; hardware frame-work acceptance remains open.
   stable retained resources and correct supported DPI/aspect behavior. Tiled images
   retain full coverage with bounded repeat geometry across cropped regions and sliced
   borders; large collection admission and hardware frame-work acceptance remain incomplete.
@@ -443,7 +444,9 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   camera owners; interactive movement, perspective release, teleport and hurt-view
   acceptance remain unverified in a displayed client. Panel previews now
   select owner-scoped HUD cards, including preview-only cards, and share retained
-  gameplay artwork. Focused rendering and cache regressions cover visible previews;
+  gameplay artwork. Optional measured fitting sizes and aligns their painted bounds
+  within tiles and sheet stages, retaining each visible instance's multiplier.
+  Focused rendering and cache regressions cover visible previews;
   populated-world and displayed-frame acceptance remain pending.
   Personal panels and HUD editor surfaces can bind the host local player's name
   and skin head, with neutral artwork when the identity is unavailable. Skin and
@@ -485,6 +488,10 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   and enable rules, and its programs translate to validated naga modules with a binding
   contract. Behind the render crate's `shaderpacks` feature, the host builds the Java-style
   block atlas packs sample. Pack-specific translation fixes, the rest of the render-host
+  integration and in-game acceptance remain incomplete. Geometry replacement retains the
+  native scene-copy path when celestial layers, effects without depth writes, or first-person
+  scenes with private depth attachments still need native composition; their geometry-host
+  composition is incomplete.
   integration and in-game acceptance remain incomplete.
   Autofocus intersects terrain model surfaces; sampling the rendered depth for cutout
   pixels, liquid heights and entities remains incomplete.
