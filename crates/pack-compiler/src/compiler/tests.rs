@@ -48,6 +48,8 @@ mod furnace;
 mod grass_side_mips;
 #[path = "tests/grindstone.rs"]
 mod grindstone;
+#[path = "tests/heavy_core.rs"]
+mod heavy_core;
 #[path = "tests/hollow_containers.rs"]
 mod hollow_containers;
 #[path = "tests/isotropic.rs"]

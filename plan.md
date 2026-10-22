@@ -132,6 +132,10 @@ and resource qualification; they do not imply these systems need to be written.
 - [ ] Close crop comparison, sub-unit sprite geometry, atlas-edge UV calibration and
   torchflower positional variation. Earlier bounded artwork fixes do not close this scope.
 - [ ] Verify nether-wart geometry and selector acceptance independently of other crops.
+- [ ] Select terrain-array entries for the remaining block classes. Pumpkins, cave vines,
+  pale hanging moss and mangrove propagules follow their native class; the families in the
+  input crate's open-array check (candles, copper bulbs, cocoa, eggs, nether wart and others)
+  still draw entry zero until each class's variant source is verified.
 - [ ] Close all fixed slab/stair gallery poses with exact GPU witnesses, matched native
   views and a clean mutation-to-visible/performance run. Isolate backend/presentation
   faults from geometry; do not mask them with speculative renderer changes.
@@ -364,6 +368,15 @@ Camera distance controls server render limits and score range; passenger mounts 
 their name without a score line. Depth testing honors sneaking and the nameplate flag.
 Matched rendered-frame qualification remains open.
 
+Actor art keeps its alpha when every material drawing it alpha-tests, or any blends or
+lights by it; otherwise alpha rounds at 0.5. The pinned samples name vanilla entity
+materials but do not define them, so all but the verified kinds in `registry-policy.json`
+are provisional with that rounding; their definitions (alpha test, blend, emissive) remain
+unverified. Rounding is wrong where alpha is an emissive weight: blaze, magma cube and glow
+squid bodies stay invisible, and spider, enderman and phantom eyes draw clear. Each rig geometry routes to the texture its own selection draws, else the
+default branch. The samples omit the iron golem's body controller; it is completed from
+the pack's default controller until a pinned pack defines it.
+
 Remaining qualification includes attachables and custom item models, action/use timing,
 projectile interpolation and shake, sleep/mount poses, name tags (including over
 oversized server cosmetics), capes, shadows,
@@ -567,16 +580,26 @@ compatibility. Existing catalog content is owned by the API repository.
 
 Local worlds use the Go server integration. Qualify creation, offline play, reload,
 import, persistence and hosting/session teardown. The accepted local-world scope does
-not establish full vanilla world-generation parity.
+not establish full vanilla world-generation parity. Dragonfly supports only flat terrain;
+natural terrain requires BDS.
 Create and edit forms persist BDS advanced, multiplayer and cheat options through a shared
 catalog and generated server properties and level data. Pack and experiment configuration,
-hardcore, flat presets, Education Edition, operator status for a signed-out host and live
+hardcore, flat presets, Education Edition, operator status for a signed-out or offline-fallback host and live
 acceptance of every option on supported platforms remain incomplete.
-hardcore, flat presets, Education Edition and live acceptance of every option on supported
-platforms remain incomplete.
+The Android translated runtime supplies a loopback route and passes two consecutive offline
+transport, signed-out login and spawn checks in an ordinary Android 15 emulator app sandbox.
+Signed-in local HTTP joins retry once with local identity when account services fail before transport
+or the launcher's own server reports missing verification keys; other rejections and external or
+transferred servers retain their authentication policy. Player-data continuity between account-backed
+and local identities, offline acceptance in the full APK and physical-phone retesting remain open. Other BDS hosts can still
+offer no NetherNet route with every external interface down, producing an explanatory error.
 Local HTTP and LAN joins include client loopback ICE candidates. Full offline play of native
 BDS worlds is still a confirmed gap: without a non-loopback network interface BDS
 offers no NetherNet route, so the join fails with an explanation instead of connecting.
+Startup logs report milestone elapsed times and child-process CPU time when available.
+Native and translated BDS startup overlaps host-profile loading and confirms any changed
+operator grant before reporting running; container servers still resolve it before launch.
+Physical-phone startup profiling and the ten-second join target remain open.
 
 See [local worlds](docs/local-worlds.md).
 
@@ -616,6 +639,33 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Built-in shaders avoid forwarding matrix parameters between functions to prevent an Adreno
   Vulkan compiler crash. Startup is confirmed on an affected Adreno 660 device; broader Android
   rendering acceptance remains incomplete.
+  Android packages the Dragonfly local-world server and resolves it from the APK's native-library
+  directory. APKs include a translator and pinned, cached guest runtime, with BDS the default
+  for new worlds. An Android-adapted GNU runtime starts BDS, creates
+  and saves a world, shuts down cleanly and reopens it in a target-SDK-35 test app on an
+  Android 15 VM with SELinux enforcing.
+  Production protocol login and spawn also pass with an extended diagnostic deadline, including
+  two consecutive runs with all external interfaces down. Translation requests stronger x86
+  memory ordering, adds a loopback route and uses Android's resolver for host names. Earlier
+  startup aborts leave reliability acceptance open. Full APK, physical-device, offline lifecycle,
+  performance and 4/16 KB compatibility acceptance remain incomplete.
+  Legacy and reverse name lookups still use the native resolver; only `getaddrinfo` uses Android's resolver.
+  Setup refreshes a private export of Android's default accepted certificate authorities and supplies it
+  to the translated server's TLS stack. An emulator check confirms the server reads the bundle;
+  its effect on service authentication and startup time needs acceptance;
+  the ten-second startup and join target is unverified.
+  The guest library is downloaded directly and hash-checked, with valid cached copies reused;
+  the source archive is needed only by the build toolchain.
+  Translated code is cached for the matching server and packaged runtime, with later starts
+  loading it without rewriting it at each stop.
+  Android asset setup downloads the server and prepares reusable startup code in an isolated
+  temporary world before reporting Ready. The first saved-world open uses that prepared code;
+  the same server and runtime reuse it across worlds, and updates invalidate it. Missing game
+  assets and cancellation still block client startup. Local-world preparation failures are logged
+  and allow the client to start for remote play or Dragonfly; BDS opens can run uncached without
+  another scratch preparation. Cache writes are skipped before creating a file if
+  they would exceed the 512 MiB cache budget or leave less than 512 MiB free. Physical-phone timing, shutdown, storage
+  and executable-cache acceptance remain incomplete.
   Pipeline loading prepares single-sample coverage before switching to Performance.
   The in-world Balanced-to-Performance transition retains the scene and settings in an Android VM capture; physical-device and startup-cost qualification remain incomplete.
   Android restores immersive system bars on resume, window focus and keyboard dismissal,
@@ -629,7 +679,7 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Touch-capable hosts expose persisted look sensitivity and control guidance. Emotes, chat and pause share a centered utility row; inventory access follows the HUD hotbar. The touch Use button admits block placement and held repeats through the shared block-use handler. The sensitivity curve, movement/action layouts, alternate touch profiles, remapping, customization, cutout handling and device layout acceptance remain open.
   Menu scroll regions and chat history accept captured finger drags; swipes cancel pending taps, and form slider gestures retain their own control. Native gesture calibration and full route/device acceptance remain open.
   Ordinary touch controls take focus only after a completed tap, preserving manual scroll positions during pending swipes.
-  Menu text editors request platform keyboards again on field changes and retaps. Android keyboard overlap reduces the UI layout viewport and reveals unchanged menu focus after resize. The People drawer filters the current friend list by gamertag. Global people lookup, gameplay text entry, full composition support and device IME acceptance remain open.
+  Menu text editors and Android in-game chat request platform keyboards again on field changes, chat opening and retaps; the platform Back key cancels chat and inventories at its place among keys and acts as mouse Back elsewhere. Android keyboard overlap reduces the UI layout viewport and reveals unchanged menu focus after resize. The People drawer filters the current friend list by gamertag. Global people lookup, sign and book text entry, Back during gameplay, chat IME composition, full composition support and device IME and Back acceptance remain open.
 - Local mods and server experiences still need runtime/input isolation, reload/reorder/
   removal, consent, custom screen transitions and media qualification. Unmeasured shared
   blur, element blur, route exits and current-world visual integration remain incomplete.
@@ -693,42 +743,38 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   occluded by world silhouettes get a dark edge fringe; per-sample composition is incomplete.
 - Java shader packs (Iris/OptiFine format) run behind the off-by-default `shaderpacks`
   feature. Shader-only world sampling, GPU pipeline creation and pack-folder discovery
-  are deferred until requested. Retired loads cancel between translation programs and GPU
-  batches; rapid selections share one load worker. The Shaders library lists Off and every
-  pack in one list ending in a drop zone; the selected pack's card shows its load state and
-  holds settings, reload and confirmed removal of imported copies and their saved settings.
-  Incomplete: matched shader-feature-off versus
-  batches; rapid selections share one load worker. The Shaders library uses full-width pack
-  rows with controls on the selected pack and confirmed removal of imported copies and their
-  saved settings. Incomplete: matched shader-feature-off versus
-  feature-on/no-pack startup, frame-time, memory and visual acceptance across supported
-  backends, including shared artwork texture views. These changes do not enable the feature
-  by default. `shaderpack` loads packs, parses `shaders.properties`, options, Iris option
-  menus, profiles and option files, evaluates custom uniforms and translates programs to
-  validated naga modules, with calls ordered after forward declarations and generated
+  are deferred until requested; a failed pack samples only the dimension its retry is keyed
+  on, the reload key acts only with a selected pack and never lists the pack folder, and pack
+  passes skip frames without a loaded pack. Retired loads cancel between translation programs
+  and GPU batches; rapid selections share one load worker. Atlas builds cancel between
+  source, pixel and upload stages, and one cancelled build retires before its replacement
+  starts. Leaving the pack releases the nametag overlay layer, and shared actor, item,
+  particle and block-entity artwork allows the raw `Rgba8Unorm` view only while a camera
+  draws a pack, recreated when that changes. The Shaders library lists Off and every pack in
+  one list ending in a drop zone; the selected pack's card shows its load state and holds
+  settings, reload and confirmed removal of imported copies and their saved settings.
+  Incomplete: matched shader-feature-off versus feature-on/no-pack startup, frame-time,
+  memory and visual acceptance across supported backends. These changes do not enable the
+  feature by default. `shaderpack` loads packs, parses `shaders.properties`, options, Iris
+  option menus, profiles and option files, evaluates custom uniforms and translates programs
+  to validated naga modules, with calls ordered after forward declarations and generated
   helpers. The render host runs Iris's frame (shadow, gbuffers for terrain, actors, block
   entities and the hand, deferred, composite and final passes, compute, custom textures and
   images) plus the pack-drawn sky, particles, clouds, weather, lightning, cracks and selection.
   Block, item, entity and biome ids and Java sky and fog colours come from the pinned
-  Bedrock→Java mappings. Settings offers pack import, a reload key, load status and a Shader
-  Pack Settings screen. Incomplete: in-game acceptance across packs and platforms (Metal is
-  unverified); stage pre-flips (`flip.<stage>_pre.<buffer>`) and Iris's explicit-flip
-  ordering; drawing the solid hand's glint before deferred passes; pack replacements
-  for uncovered celestial layers (the pack sky stands), actor colour masks, multitexture
-  materials, dissolve pairs, beacon beams and additive rays (these retain native
-  composition over the pack); native layers behind pack-rendered glass or water, whose
-  final depth can hide those layers; autofocus on cutout
   Bedrock→Java mappings. The Shaders settings tab offers pack import, reload, load status
   and a Shader Pack Settings screen. Video links to Shaders and shows its renderer switch
   only when Enhanced is available.
-  Incomplete: in-game acceptance across packs and platforms (Metal is unverified); stage pre-flips (`flip.<stage>_pre.<buffer>`) and Iris's explicit-flip
-  ordering; drawing the solid hand's glint before deferred passes; geometry-host composition
-  of celestial layers, effects without depth writes and private-depth first-person scenes,
-  which keep the native scene copy; actor colour masks, multitexture materials, dissolve
-  pairs, beacon beams and additive rays, which keep native composition; autofocus on cutout
-  pixels, liquids and entities; complete Iris type checking and target-dependent return
-  overloads; constant folding for half-float packing and bit casts. Java sky and fog time
-  curves and sunrise colours remain provisional.
+  Incomplete: in-game acceptance across packs and platforms (Metal is unverified); stage
+  pre-flips (`flip.<stage>_pre.<buffer>`) and Iris's explicit-flip ordering; drawing the
+  solid hand's glint before deferred passes; geometry-host composition of celestial layers,
+  effects without depth writes and private-depth first-person scenes, which keep the native
+  scene copy; actor colour masks, multitexture materials, dissolve pairs, beacon beams and
+  additive rays, which keep native composition; native layers behind pack-rendered glass or
+  water, whose final depth can hide those layers; autofocus on cutout pixels, liquids and
+  entities; complete Iris type checking and target-dependent return overloads; constant
+  folding for half-float packing and bit casts. Java sky and fog time curves and sunrise
+  colours remain provisional.
 - `registryc --kind java-mapping` generates `crates/assets/data/java-mapping-v2193.bin` from
   the GeyserMC data pinned in `assets/geyser-mappings-source.json`: Java block states, block
   tags, biomes and their colours, entity types and items for every Bedrock id Geyser maps.
