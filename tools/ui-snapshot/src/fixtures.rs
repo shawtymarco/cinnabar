@@ -20,6 +20,7 @@ mod updates;
 
 use std::sync::Arc;
 
+use launcher::local_worlds::world::UnavailableReason;
 use launcher::menu::{
     MenuAction, MenuScreen, MenuView, settings_options::SettingId,
     settings_sections::SettingSection,
@@ -539,6 +540,12 @@ const STATES: &[State] = &[
         fixture: out_of_game::disconnect_device_clock,
     },
     State {
+        name: "disconnect-local-world-offline",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: out_of_game::disconnect_local_world_offline,
+    },
+    State {
         name: "connect-failed",
         size: SIZE,
         gui_scale: GUI_SCALE,
@@ -615,6 +622,18 @@ const STATES: &[State] = &[
         size: SIZE,
         gui_scale: GUI_SCALE,
         fixture: out_of_game::play_worlds_importing,
+    },
+    State {
+        name: "local-docker-missing",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: || out_of_game::docker_prompt(UnavailableReason::DockerMissing),
+    },
+    State {
+        name: "local-docker-not-running",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: || out_of_game::docker_prompt(UnavailableReason::DockerNotRunning),
     },
     State {
         name: "world-edit-after-delete-back",
@@ -764,6 +783,24 @@ const STATES: &[State] = &[
         fixture: shader_pack::pack_picker,
     },
     State {
+        name: "settings-shaders-remove",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: shader_pack::removal_dialog,
+    },
+    State {
+        name: "settings-shaders-empty",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: shader_pack::empty_library,
+    },
+    State {
+        name: "settings-shaders-narrow-library",
+        size: [800, 720],
+        gui_scale: GUI_SCALE,
+        fixture: shader_pack::long_library,
+    },
+    State {
         name: "settings-storage",
         size: SIZE,
         gui_scale: GUI_SCALE,
@@ -905,36 +942,6 @@ const STATES: &[State] = &[
         gui_scale: GUI_SCALE,
         fixture: shader_options::rest,
     },
-    State {
-        name: "toast-shader-pack-loading",
-        size: SIZE,
-        gui_scale: GUI_SCALE,
-        fixture: shader_pack::loading,
-    },
-    State {
-        name: "toast-shader-pack-loaded",
-        size: SIZE,
-        gui_scale: GUI_SCALE,
-        fixture: shader_pack::loaded,
-    },
-    State {
-        name: "toast-shader-pack-failed",
-        size: SIZE,
-        gui_scale: GUI_SCALE,
-        fixture: shader_pack::failed,
-    },
-    State {
-        name: "settings-shaders-selected",
-        size: SHADER_PACK_ROW_SIZE,
-        gui_scale: GUI_SCALE,
-        fixture: || shader_pack::settings_shaders(false),
-    },
-    State {
-        name: "settings-shaders-failed",
-        size: SHADER_PACK_ROW_SIZE,
-        gui_scale: GUI_SCALE,
-        fixture: || shader_pack::settings_shaders(true),
-    },
 ];
 
 /// Opens a settings category by its registered name rather than a copied index.
@@ -954,6 +961,7 @@ pub fn states() -> impl Iterator<Item = &'static State> {
         .iter()
         .chain(out_of_game::WORLD_FORM_STATES)
         .chain(updates::STATES)
+        .chain(shader_pack::STATES)
         .chain(social_settings::STATES)
         .chain(settings_screens::SEARCH_STATES)
 }

@@ -297,6 +297,13 @@ mounts retract toward the bare torso and expand to clear equipped chest geometry
 Vertical follow and damping restrain jump and landing motion, and local cloth keeps
 advancing while first-person visibility hides the body. View changes transfer the drape between
 body pose spaces. Self-collision and world collision remain open.
+Ground-following pets have per-wearer movement, collision-shape grounding, one-block
+hops with checked flight paths and landings, heading-aware animated body clearance,
+obstacle steering and distance-driven gait playback.
+Idle clips settle into a sit
+and optional tricks. Missing terrain freezes the follower; ordinary blockage never
+teleports it. Owner teleports reset only onto checked ground. Broader terrain acceptance, swimming,
+flight, animation-triggered effects and performance qualification remain open.
 Paid cosmetic selections use session ownership from the API database and withdraw
 on disconnect or revocation. Unowned wardrobe tiles are dimmed with a lock badge
 and excluded from pointer and keyboard wear selection; production rollout
@@ -383,13 +390,12 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   combat, hotbar selection, stack/network-ID reconciliation and container/crafting
   prediction, acknowledgements, rollback and stale-session behavior.
   Native block requirements now cover every catalog identifier, including no-tool
-  beds; recipe tags share the pinned native catalog. Custom block mining retains
-  default, disabled and item-specific component values, including state overrides.
-  Discarded mining data stays unresolved, and item-tag filters compile during
-  session preparation for allocation-free evaluation.
-  Mining uncertainty leaves known physics and local placement prediction usable.
-  Mining states use separate storage and admission, preserving the physical state budget.
-  Complex item-tag scripts and live custom-block mining acceptance remain incomplete.
+  beds; recipe tags share the pinned native catalog. Custom block mining reads the
+  client's float `value` and item-specific overrides for every admitted state.
+  Malformed item entries never match, and conditions the client reads as zero keep
+  the base value; item-tag filters compile during session preparation for
+  allocation-free evaluation, and an unsupported filter matches no item.
+  Complex Molang conditions and item-tag scripts read as zero, which is incomplete.
   Sword/shears speed rules,
   effective item durability and live mining acceptance remain incomplete.
   Trading screens admit server offers and support purchases with manually placed inputs.
@@ -397,6 +403,8 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   classic preview rich tooltips, and full item/container acceptance across trading layouts
   remain incomplete.
   Block-item purchases await an authoritative result preview to retain its block identity.
+  Server items whose `minecraft:shooter` draws start a held use that release ends;
+  shooters with ammunition entries or `charge_on_draw` remain incomplete.
   Furnace quick moves retain admitted fuel facts for canonical-empty item descriptors;
   explicit server fuel declarations keep priority. Named station responses retain
   accepted stacks at their window indices. Broader custom-fuel and matched server
@@ -515,8 +523,12 @@ import, persistence and hosting/session teardown. The accepted local-world scope
 not establish full vanilla world-generation parity.
 Create and edit forms persist BDS advanced, multiplayer and cheat options through a shared
 catalog and generated server properties and level data. Pack and experiment configuration,
+hardcore, flat presets, Education Edition, operator status for a signed-out host and live
+acceptance of every option on supported platforms remain incomplete.
 hardcore, flat presets, Education Edition and live acceptance of every option on supported
 platforms remain incomplete.
+Offline play of BDS worlds is a confirmed gap: without a non-loopback network interface BDS
+offers no NetherNet route, so the join fails with an explanation instead of connecting.
 
 See [local worlds](docs/local-worlds.md).
 
@@ -547,6 +559,9 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Built-in shaders avoid forwarding matrix parameters between functions to prevent an Adreno
   Vulkan compiler crash. Startup is confirmed on an affected Adreno 660 device; broader Android
   rendering acceptance remains incomplete.
+  Android restores immersive system bars on resume, window focus and keyboard dismissal,
+  while preserving keyboard control. Device-window regression coverage does not close
+  physical-phone navigation, cutout or gameplay acceptance.
   Keep browser gesture activation and background work within the host's event-loop rules.
   Touch-capable hosts expose persisted look sensitivity and control guidance. The sensitivity curve is provisional; native touch layouts, remapping and customization remain open.
   Menu scroll regions and chat history accept captured finger drags; swipes cancel pending taps, and form slider gestures retain their own control. Native gesture calibration and full route/device acceptance remain open.
@@ -610,7 +625,18 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Its MSAA nametag composite blends against resolved scene colour, so labels partly
   occluded by world silhouettes get a dark edge fringe; per-sample composition is incomplete.
 - Java shader packs (Iris/OptiFine format) run behind the off-by-default `shaderpacks`
-  feature. `shaderpack` loads packs, parses `shaders.properties`, options, Iris option
+  feature. Shader-only world sampling, GPU pipeline creation and pack-folder discovery
+  are deferred until requested. Retired loads cancel between translation programs and GPU
+  batches; rapid selections share one load worker. The Shaders library lists Off and every
+  pack in one list ending in a drop zone; the selected pack's card shows its load state and
+  holds settings, reload and confirmed removal of imported copies and their saved settings.
+  Incomplete: matched shader-feature-off versus
+  batches; rapid selections share one load worker. The Shaders library uses full-width pack
+  rows with controls on the selected pack and confirmed removal of imported copies and their
+  saved settings. Incomplete: matched shader-feature-off versus
+  feature-on/no-pack startup, frame-time, memory and visual acceptance across supported
+  backends, including shared artwork texture views. These changes do not enable the feature
+  by default. `shaderpack` loads packs, parses `shaders.properties`, options, Iris option
   menus, profiles and option files, evaluates custom uniforms and translates programs to
   validated naga modules, with calls ordered after forward declarations and generated
   helpers. The render host runs Iris's frame (shadow, gbuffers for terrain, actors, block
