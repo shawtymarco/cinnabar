@@ -26,11 +26,14 @@ evidence; the [workspace map](docs/architecture/workspace.md) explains code owne
    Windows VSync queue depth uses coarse work estimates to try one queued frame and
    observed acquisition cadence to restore two. Failed probes back off exponentially;
    missing GPU samples leave the cadence policy running.
-   Desktop presentation defaults to Mailbox where available, with an explicit tearing
-   choice; Android retains VSync. Menus use a display-refresh ceiling, and untouched
-   in-world limits use that ceiling on battery. Saved limits remain authoritative.
+   Desktop VSync defaults to Off, preferring Mailbox, then Immediate, then FIFO;
+   Android defaults to On. The diagnostic `--no-vsync` flag prefers Immediate.
+   Menus use a display-refresh ceiling, and untouched in-world limits use that ceiling on battery. Saved limits remain authoritative.
    Capped input admission wakes at its own deadline before considering a later render
    prediction, so completed rendering cannot hide the requested cadence.
+   macOS adaptive refresh capabilities leave automatic VRR unconfirmed, and native
+   Metal presentation logs expose the layer state and software cap. Fullscreen
+   VSync-off cadence still needs hardware qualification.
    Displayed cadence, input latency and surface-reconfiguration
    stalls still need hardware qualification; this closes no acceptance gate.
 3. Verify complete session and input paths across supported platforms.
@@ -95,7 +98,7 @@ and resource qualification; they do not imply these systems need to be written.
   presentation and animation. Identify unsupported states before adding implementation.
   Held end-rod models and narrow rod selection bounds are implemented; matched final-frame
   outlines and third-person held-item qualification remain incomplete.
-  Entity-drawn blocks retain pack face materials for destruction and mining particles;
+  Chests retain pack face materials for destruction and mining particles;
   matched chest-particle presentation and custom destruction overrides remain incomplete.
 - [ ] Close straw-bed native-gallery and replacement-pack acceptance. Both halves
   use pack geometry in all four directions; sleeping and picking remain unqualified.
@@ -119,9 +122,10 @@ and resource qualification; they do not imply these systems need to be written.
 - [ ] Close barrel/trapdoor visual acceptance, including facing/open states, grain,
   carried items, edge UVs, replacement materials and different texture resolutions.
 - [ ] Close directional cube face mapping. Furnace-family cubes and the loom select pack
-  faces (and the loom's top/bottom flips) from their facing; other mapped-face cubes such as
-  carved pumpkins, observers, dispensers and droppers, and the stonecutter's east/west saw
-  axis, still need checking against their native tessellation, plus native-server captures.
+  faces (and the loom's top/bottom flips) from their facing, and the stonecutter turns its saw
+  plane and top art with its direction; other mapped-face cubes such as carved pumpkins,
+  observers, dispensers and droppers still need checking against their native tessellation,
+  plus native-server captures.
 - [ ] Close chiseled-bookshelf native-gallery acceptance with two consecutive exact
   GPU-completed model-stream witnesses.
 - [ ] Close resin-clump native-gallery acceptance with two consecutive exact
@@ -329,6 +333,10 @@ and rendered qualification remain incomplete.
 - [ ] `P4.4-LIVE-ACTOR` — Close spawn, movement, rotation and teleport ground-contact
   acceptance, including correct player-origin conversion and frame interpolation.
   Keep visual eye height and the protocol movement offset as separate owned facts.
+  Movement retains signed byte rotations and exact network heights through tick and
+  frame interpolation and predicted picking. Specialized projectile and vehicle movement,
+  remote-player packet modes, stance and riding update timing, partially loaded terrain,
+  and matched packet-stream replay acceptance remain incomplete.
   Player deaths hide after their brief sequence while retaining the actor; later
   server flags control visibility through revival. Original Zeqa acceptance remains open.
 - [ ] `P4.5-ITEM-ACTIONS` — Close held items, actions, dropped items and viewmodel behavior,
@@ -470,7 +478,10 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   each ingredient draws from one concrete variant. Missing grid ingredients and their
   result use distinct ghost cells in both renderers and retain hover names.
   Broader crafting and container acceptance remains incomplete.
-  Hover reports and actor use share the attack's game-mode actor cap. The survival
+  Hover reports and actor use share the attack's game-mode actor cap.
+  Actor rays use loaded collision defaults, authoritative dimensions and scale, and
+  constructor pick radii. Attack, use and hover preserve the selected world intercept;
+  matched server-box packet acceptance remains incomplete. The survival
   block-versus-miss bands at that cap, the creative cap's shortening by the pick ray and
   actor occlusion of the block outline remain incomplete.
   Desktop input retains every transition in a complete arrival batch, including
