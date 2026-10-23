@@ -26,6 +26,8 @@ evidence; the [workspace map](docs/architecture/workspace.md) explains code owne
    Windows VSync queue depth uses coarse work estimates to try one queued frame and
    observed acquisition cadence to restore two. Failed probes back off exponentially;
    missing GPU samples leave the cadence policy running.
+   Capped input admission wakes at its own deadline before considering a later render
+   prediction, so completed rendering cannot hide the requested cadence.
    Displayed cadence, input latency and surface-reconfiguration
    stalls still need hardware qualification; this closes no acceptance gate.
 3. Verify complete session and input paths across supported platforms.
@@ -88,6 +90,8 @@ and resource qualification; they do not imply these systems need to be written.
 
 - [ ] Qualify static/non-cube models, blend/water and flipbooks, including native
   presentation and animation. Identify unsupported states before adding implementation.
+  Held end-rod models and narrow rod selection bounds are implemented; matched final-frame
+  outlines and third-person held-item qualification remain incomplete.
   Entity-drawn blocks retain pack face materials for destruction and mining particles;
   matched chest-particle presentation and custom destruction overrides remain incomplete.
 - [ ] Close straw-bed native-gallery and replacement-pack acceptance. Both halves
@@ -251,6 +255,9 @@ Historical movement acceptance scope includes sprint/double-tap/toggle timing, f
 sneak/crawl, mode entry/exit, flight, swimming/gliding, liquid correction and scaffolding
 descent. Reconcile each case with current code and evidence before calling it a missing
 implementation.
+Elytra gliding retains the sprint state and its movement-speed modifier through
+completed ticks and correction replay. Rendered acceptance of sprinting and
+Speed-boosted glide camera motion remains outstanding.
 Keep raw, analogue and processed input semantics distinct. Mounted controls need
 attributable vehicle mapping, constants, state and actual prediction before claiming
 client-predicted vehicle behavior. Riding alone does not establish that capability.
@@ -459,6 +466,9 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   DenyDestroyBlock action, Attack swing source and missed swing remain incomplete.
   Server items whose `minecraft:shooter` draws start a held use that release ends;
   shooters with ammunition entries or `charge_on_draw` remain incomplete.
+  Fishing rods predict a fresh-press swing and choose cast artwork from live hook ownership.
+  Line anchors follow the rendered built-in sprite tip; replacement-art tips, custom attachables
+  and exact cast/retrieve cadence remain incomplete.
   Furnace quick moves retain admitted fuel facts for canonical-empty item descriptors;
   explicit server fuel declarations keep priority. Named station responses retain
   accepted stacks at their window indices. Broader custom-fuel and matched server
@@ -620,7 +630,7 @@ qualification remain incomplete.
 Complete clean-install, first-run asset preparation, update/install recovery, startup
 and crash diagnostics, packaging and platform acceptance. Required carriers must pass
 validation; retain only the explicitly permitted diagnostic/optional fallbacks.
-Desktop startup feedback runs independently while resources and graphics initialize. Android has an asset-independent starting theme and activity overlay. Feedback retires after a completed destination-interface frame. Desktop and Android-emulator recordings confirm feedback and handoff to the first menu with prepared assets. Activity responsiveness during native initialization and broader device acceptance remain pending.
+Desktop startup feedback starts without waiting for its loading window and uses the menus' stepped GUI scale and saved offset. Android has an asset-independent starting theme and activity overlay. Feedback retires after a completed destination-interface frame. Desktop and Android-emulator recordings confirm feedback and handoff to the first menu with prepared assets. Activity responsiveness during native initialization and broader device acceptance remain pending.
 
 Linux updates support writable AppImages and extracted AppDirs, including `install.sh`
 installations, with verified extraction and startup rollback. Packaged Linux update and
