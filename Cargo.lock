@@ -480,6 +480,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "shaderpack",
  "tempfile",
  "tokio",
  "world",
@@ -2718,7 +2719,6 @@ dependencies = [
  "json-ui",
  "launcher",
  "launcher-host",
- "ndk-context",
  "objc2-metal 0.3.2",
  "pack-runtime",
  "player-state",
@@ -4572,6 +4572,7 @@ dependencies = [
  "cfg-if",
  "crunchy",
  "num-traits",
+ "serde",
  "zerocopy",
 ]
 
@@ -6022,6 +6023,7 @@ dependencies = [
  "once_cell",
  "pp-rs",
  "rustc-hash 1.1.0",
+ "serde",
  "spirv",
  "thiserror 2.0.18",
  "unicode-ident",
@@ -8321,11 +8323,16 @@ name = "shaderpack"
 version = "0.1.28"
 dependencies = [
  "assets",
+ "ciborium",
+ "libc",
  "naga",
  "pp-rs",
  "rayon",
+ "serde",
  "serde_json",
  "tempfile",
+ "test-time",
+ "windows-sys 0.61.2",
  "zip",
  "zip-footer",
 ]
