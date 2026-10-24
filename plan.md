@@ -128,12 +128,11 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
   until exact face-coverage behavior is verified separately. Inventory fences draw the
   native two-post shape. Walls now use the custom carried two-post shape, and vanilla
   gate item meshes turn into the custom carried axis. Native wall/gate inventory parity
-  and fresh integrated-frame acceptance remain unverified. World bamboo fences stretch the
-  native post and slat texture regions; their inventory icon still uses ordinary fence UVs,
-  bamboo fence gates still use ordinary gate UVs instead of native `_trySetFenceGateTexture`
-  regions, and world fence rails still omit the outer end faces native tessellation draws.
-  and fresh integrated-frame acceptance remain unverified; bamboo fence slats are also open, and
-  world fence rails still omit the outer end faces native tessellation draws.
+  and fresh integrated-frame acceptance remain unverified. World bamboo fences and bamboo
+  fence gates stretch their native texture regions over each piece face; the bamboo fence
+  inventory icon still uses ordinary fence UVs instead of the native bamboo GUI shape and
+  slat regions, the down/up quarter-turn direction of turned bamboo rail and slat tops is
+  unverified, and world fence rails still omit the outer end faces native tessellation draws.
   World walls preserve the central post outside postless straight pairs, merge those pairs
   to their lower connection height, and use outside-facing UVs. Complete wall material,
   lighting and gallery acceptance remain open.
@@ -309,14 +308,32 @@ Keep raw, analogue and processed input semantics distinct. Mounted controls need
 attributable vehicle mapping, constants, state and actual prediction before claiming
 client-predicted vehicle behavior. Riding alone does not establish that capability.
 
+The block climber rewrites its contact flags after each movement tick; the descent
+action reads the retained contact before movement. Prediction sync reports those values
+with newer accepted server flag edits, which retained corrections also apply before input
+on replay. Each input frame retains the server edits it consumed and its original live
+entry flags. Replay rebuilds contact without replacing that comparison capture. Per-bit
+edits survive unrelated replays before and after consumption, including unstamped and
+future-stamped edits. Powder snow uses the mover's contextual query,
+including step and sneak-edge checks: snow-standing wearers get the full block, and falls
+over 2.5 blocks get the 0.9 fall-into shape. Replay refreshes historical fall distance
+while preserving the live value through spatial copy-back and snaps. The next input
+retains any restored live value so later replays consume it at the same boundary.
+No-move ticks preserve it unless an action or contact
+clears it. Flight toggles, bubble columns, honey sliding and water entry clear it at their
+movement phases; lava halves the retained distance before the current drop, and slow glide
+uses its entry velocity. The missing touch descend control, first-tick terrain seeding,
+coordinate/query recovery and broader custom geometry remain inherited incomplete work.
 Correction sync retains individual accepted flag writes, cached passenger movement,
 explicit dimensions and unscaled local pose sizes. It reports accepted movement speed
 independently of simulation admission. Unsupported attribute models leave reporting
 with the actor's current value. Retained corrections arm its idle countdown;
-bare snaps do not. A completed local pose tick replaces earlier accepted pose writes.
+bare snaps do not. Pose triggers refresh their independent bits after each local tick.
 Sparse dimension writes preserve the untouched accepted component, including local
 pose sizes. Dimensions enter gameplay with ordered metadata controls, and correction
-replay retains their order alongside flag writes. Network and synthetic local actors
+replay retains their order alongside flag writes. Accepted pose corrections resize
+before replayed local rules can end the pose within the same tick.
+Network and synthetic local actors
 share arrival-ordered authority lifetimes. Rendering uses a separate nonzero lifetime,
 including for the initial synthetic local body and first-person hand.
 Received local spawns, removals and dimension resets publish complete replacement
@@ -325,15 +342,31 @@ and its already accepted updates and effects. Replacement retires cached flags, 
 comparisons, dimensions, item use and movement attributes. Replay retains ordered
 actor and controller writes independently of the replaced actor state. Unknown passenger identities
 defer controller selection until their arrival order can be resolved.
-Server-driven gameplay pose and item-use starts, Riptide flag lifetimes,
-block-climber flags, custom collision definitions, transition-tick packet ordering
-and broader live-server qualification remain incomplete.
+Server-driven item-use gameplay starts, block-climber flags, custom collision
+definitions, transition-tick packet ordering and broader live-server qualification
+remain incomplete.
 Animation-only flags must remain separate from gameplay and correction authority.
 Snapped corrections and teleports keep the local input tick when the server stamp is
 unretained or ahead; acceptance on servers that stamp their own clock is outstanding.
 Server sneak updates preserve local hold/toggle intent, and the next completed input
 corrects a conflicting stance through start/stop actions retained across tickless frames
-and replay. Live-server pickup and remote-player stance acceptance remains outstanding.
+and replay. Server glide/swim/crawl and Riptide spin flags start or end the local state
+without start/stop actions. Each retained frame captures the flag word it starts with; a
+stamped write becomes a correction of the following frame where it differs from that
+capture and requests replay when that following frame is retained. Current stamps
+wait for the next frame; a future stamp joins the current frame without immediate replay.
+Replay keeps the starting frame's capture, refreshes later ones and copies the replayed
+word back to the live state, keeping the live spin and glide counters, swim blend and
+camera eye blend. Glide, swim and crawl retain independent bits beside flight;
+their own trigger transitions produce actions, and their combined state feeds
+the compact body, swim blend and eye offset. Replay preserves the pending swim-blend
+input across immobile pose transitions; only changed swim or crawl corrections replace it.
+Still incomplete: reconciling server `UsingItem` writes with local-use gameplay;
+the Riptide spin's entity-hit end, which
+needs a mob classification the entity facts lack (vanilla counts mobs whose box meets the
+player's grown by one block, scaling velocity by -0.2 per hit); block-climber flags; and
+live-server evidence for these adoptions.
+Live-server pickup and remote-player stance acceptance remains outstanding.
 Sneaking box height, pose fit and crouch eye follow StartGame's base game version
 (standing height before 1.20.10), including server resizes after prediction resets.
 Near-contact collision fixes do not establish complete collision-engine parity.
@@ -384,6 +417,14 @@ and rendered qualification remain incomplete.
   Geometry with matching resolved inheritance chains and identical animation or controller
   definitions across pack files resolve as one. Differing duplicates (the turtle's two `move`
   controllers) still reject the rig: native file load order is unverified.
+  Shulkers publish their peek and attach-face variables and keep a zero body yaw;
+  attach-position snapping, peek-dependent collision bounds and a rendered comparison
+  against the vanilla client remain incomplete.
+  definitions across pack files resolve as one. Conflicting animation definitions retain
+  drawable geometry in an explicit rest-pose fallback, including server-selected clips
+  and implicit animated-face controllers.
+  Turtle animation and duplicate-definition precedence remain incomplete; the fallback does not
+  establish native animation behavior.
   Skin cubes retain signed extents after negative inflation. Rendered qualification of
   server-modified skins, including standard 64-pixel appearances, remains incomplete.
 - [ ] `P4.4-LIVE-ACTOR` — Close spawn, movement, rotation and teleport ground-contact
@@ -402,7 +443,8 @@ and rendered qualification remain incomplete.
   Dropped crossed plants, lanterns, chains, torches, bamboo, coral fans, rails, leaf litter,
   resin clumps, hooks, ladders, lily pads, sea pickles, candles and metal bars use their carried
   sprites; falling blocks retain their world models.
-  Implemented dropped sprite families, including flower beds, use their carried artwork.
+  Implemented dropped sprite families, including flower beds, shaped plants and eggs, use
+  their carried artwork. Spike icon faces and native transforms remain incomplete.
   Other drop classes and native poses remain incomplete. Falling blocks retain their world models.
   Dropped crossed plants, lanterns, chains, ladders, lily pads, sea pickles and powered rails use their carried sprites; falling blocks retain their world models.
   Dropped crossed plants, lanterns, chains, bamboo, coral fans, rails, leaf litter, resin clumps,
@@ -413,6 +455,14 @@ and rendered qualification remain incomplete.
   resin clumps, hooks, ladders, lily pads and sea pickles use their carried sprites; falling
   blocks retain their world models.
   Dropped crossed plants, lanterns, chains, ladders, lily pads and sea pickles use their carried sprites; falling blocks retain their world models.
+  Implemented dropped sprite families use their carried artwork; falling blocks retain their world models.
+  Ordinary model-class drops prefer carried geometry from matching terrain, with session
+  artwork taking priority. Final transforms, tinting and animation remain incomplete.
+  Implemented dropped sprite families use their carried artwork; falling blocks retain
+  their world models. Ordinary model-class drops use carried geometry matched to their
+  terrain source. Dedicated dropped block items share prepared held geometry and texture
+  tiles. Admitted session artwork takes priority. Other drop classes, native poses,
+  lighting, tint, animation and per-stack model state remain incomplete.
   Held lecterns reuse the placed stand; their hand pose comparisons remain incomplete.
   Held heads reuse the placed-head meshes and textures; their native hand pose, scale,
   inventory preview and resource-pack geometry acceptance remain incomplete.
@@ -969,13 +1019,16 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   fenced throughout. Write failures end the optional session without retry timers. A two-world
   example uses upstream Dragonfly. Cold-client bundle hosting and live multi-client transfer qualification remain
   incomplete.
-- Local mods and server experiences still need runtime/input isolation, reload/reorder/
+- The Mods settings list starts with compact headers and opens one whole card at a time;
+  actions and permission details remain inside that card.
+  Local mods and server experiences still need runtime/input isolation, reload/reorder/
   removal, consent, custom screen transitions and media qualification. Source polling
   reuses immutable source bytes and verified packages while their selected files retain the
   same identity and change timestamps, with content revalidated every two seconds (four
   normal polls) to catch writes with unchanged metadata on every platform. Unmeasured shared
   blur, element blur, route exits and current-world visual integration remain incomplete.
-  Source-driven mod projects generate typed Rust/Go messages, registry confirmation,
+  Source-driven mod projects generate typed Rust/Go messages, direction-checked sends
+  and handlers on both halves, registry confirmation,
   compile-checked asset constants and paired `.cmod` packages through `devtool mod new/build`.
   Typed block/item declarations generate server registration and ordinary packs; installation
   feeds the existing local-server hosts, and `mod run` builds an isolated development loop.
@@ -1013,6 +1066,9 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Host cancellation retires the interrupted helper without consuming guest strikes or restart attempts;
   only guest budget and protocol failures consume strikes, while transport failures recover separately.
   Leave writes need no live world. Player callbacks retain the world tick captured with each observation.
+  Server WIT 0.9 adds instance simulation ticks and cancellable timers through the existing
+  callback queue, with unload pause, opening fences and counted overflow. Entity registration,
+  replication, riding, steering and mixed-client ship acceptance remain incomplete.
   Client epoch receipt, rendered destination readiness, crash recovery and live transfer acceptance
   remain incomplete.
 - Native click caps and local weather overrides have transactional host APIs and
@@ -1186,7 +1242,7 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
 - Runtime pack compatibility still includes custom texture inheritance/tints, authored
   geometry and block/item component behavior beyond the currently supported cases.
 
-See [Android](docs/android.md), [mods](docs/modding-spike.md),
+See [Android](docs/android.md), [mods](docs/mods/README.md),
 [server experiences](docs/server-experiences.md) and
 [experience runtime](docs/experience-runtime.md) for existing implementation contracts.
 
