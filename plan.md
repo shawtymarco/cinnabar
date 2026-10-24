@@ -308,8 +308,8 @@ client-predicted vehicle behavior. Riding alone does not establish that capabili
 Correction sync retains individual accepted flag writes, cached passenger movement,
 explicit dimensions and unscaled local pose sizes. It reports accepted movement speed
 independently of simulation admission. Unsupported attribute models leave reporting
-with the actor's current value. A completed local pose tick replaces earlier accepted
-pose writes. Retained corrections arm its idle countdown; bare snaps do not.
+with the actor's current value. Retained corrections arm its idle countdown;
+bare snaps do not. A completed local pose tick replaces earlier accepted pose writes.
 Sparse dimension writes preserve the untouched accepted component, including local
 pose sizes. Dimensions enter gameplay with ordered metadata controls, and correction
 replay retains their order alongside flag writes. Network and synthetic local actors
@@ -321,15 +321,17 @@ and its already accepted updates and effects. Replacement retires cached flags, 
 comparisons, dimensions, item use and movement attributes. Replay retains ordered
 actor and controller writes independently of the replaced actor state. Unknown passenger identities
 defer controller selection until their arrival order can be resolved.
-Server-driven gameplay pose and item-use starts, riptide flag
-lifetimes, block-climber flags, custom collision definitions, legacy sneak height,
-transition-tick packet ordering and broader live-server qualification remain incomplete.
+Server-driven gameplay pose and item-use starts, Riptide flag lifetimes,
+block-climber flags, custom collision definitions, transition-tick packet ordering
+and broader live-server qualification remain incomplete.
 Animation-only flags must remain separate from gameplay and correction authority.
 Snapped corrections and teleports keep the local input tick when the server stamp is
 unretained or ahead; acceptance on servers that stamp their own clock is outstanding.
 Server sneak updates preserve local hold/toggle intent, and the next completed input
 corrects a conflicting stance through start/stop actions retained across tickless frames
 and replay. Live-server pickup and remote-player stance acceptance remains outstanding.
+Sneaking box height, pose fit and crouch eye follow StartGame's base game version
+(standing height before 1.20.10), including server resizes after prediction resets.
 Near-contact collision fixes do not establish complete collision-engine parity.
 Remote player presentation interpolates received positions along straight segments,
 which can cross a block corner between clear endpoints. Teleports discard that
@@ -393,7 +395,7 @@ and rendered qualification remain incomplete.
   including remote/local playback and session lifecycle.
   Ordinary third-person items select separate main- and offhand grips, including native
   weapon sprites and custom-model icon fallbacks.
-  Dropped crossed plants, lanterns and chains use their carried sprites; falling blocks retain their world models.
+  Dropped crossed plants, lanterns, chains, ladders, lily pads and sea pickles use their carried sprites; falling blocks retain their world models.
   Held heads reuse the placed-head meshes and textures; their native hand pose, scale,
   inventory preview and resource-pack geometry acceptance remain incomplete.
   Held maps submit server image updates over runtime pack paper in either hand.
@@ -439,7 +441,9 @@ and rendered qualification remain incomplete.
   without one. Copper golem statue previews use the standing pack geometry, oxidation
   artwork and eye layer; item pose metadata remains incomplete. Variant indices of
   1.26.50 legacy icon rows (poplar boats, cushions) follow the atlas order but are not
-  confirmed against that client.
+  confirmed against that client. Registry blocks without a named item (nether reactor
+  core, double slabs, wall signs) draw their implicit block item from the first canonical
+  state; vanilla uses the block's default state, which is not yet compared per block.
 
 Continuous cosmetic cloth uses shared vertices, fixed-step constraints, world-space
 inertia and contacts derived from the drawn body and worn armor. Cloth pins and
@@ -493,11 +497,16 @@ ticks; dragon breath retains its five-tick emitter. Legacy emission and matched
 rendered-frame qualification remain open.
 
 Actor art keeps its alpha when every material drawing it alpha-tests, or any blends or
-lights by it; otherwise alpha rounds at 0.5. The pinned samples name vanilla entity
-materials but do not define them, so all but the verified kinds in `registry-policy.json`
-are provisional with that rounding; their definitions (alpha test, blend, emissive) remain
-unverified. Rounding is wrong where alpha is an emissive weight: blaze, magma cube and glow
-squid bodies stay invisible, and spider, enderman and phantom eyes draw clear. Each rig geometry routes to the texture its own selection draws, else the
+lights by it; otherwise alpha rounds at 0.5. Generated declaration states cover the pinned entity material vocabulary except cushion.
+They preserve emissive body and invisible-eye alpha, culling, blending, depth comparison
+and target-channel writes. These states are provisional (older declaration, current
+behaviour unverified); current shader and rendered-frame qualification remain open.
+Cushion retains provisional rounding until its declaration is available.
+Render-controller material arrays and ternaries remain incomplete.
+Frames with Equal-depth actor overlays keep actors on native rendering so pack vertex
+transforms cannot separate their depth surfaces. Paired dissolve materials retain their dedicated renderer contracts; applying their
+generated states to held and worn presentations remains incomplete.
+Each rig geometry routes to the texture its own selection draws, else the
 default branch. The samples omit the iron golem's body controller; it is completed from
 the pack's default controller until a pinned pack defines it.
 
@@ -916,11 +925,23 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   server coalesces rapid transfers to the latest desired world, sending its next
   notice only after the outstanding acknowledgment arrives and keeping messages
   fenced throughout. Write failures end the optional session without retry timers. A two-world
-  example uses upstream Dragonfly. Cold-client bundle hosting, generated application
-  Go message bindings and live multi-client transfer qualification remain incomplete.
+  example uses upstream Dragonfly. Cold-client bundle hosting and live multi-client transfer qualification remain
+  incomplete.
 - Local mods and server experiences still need runtime/input isolation, reload/reorder/
   removal, consent, custom screen transitions and media qualification. Unmeasured shared
   blur, element blur, route exits and current-world visual integration remain incomplete.
+  Source-driven mod projects generate typed Rust/Go messages, registry confirmation,
+  compile-checked asset constants and signed bundles through `devtool mod new/build`.
+  Each recipient retains messages, media, input and state in one callback queue during
+  registry negotiation. Generated confirmations retry after send-budget refusal and
+  expire with their connection or world epoch. A shared Rust/Go rate contract charges
+  native epochs and encoded fragment sizes, rejects impossible control batches, and
+  reserves acknowledgment exemptions for outstanding notices. Confirmation replays
+  the latest queued state once, then all callback kinds follow FIFO order through a fair recipient scheduler;
+  traps preserve later queued work, stale world callbacks are discarded,
+  and queue overflow visibly stops the affected part.
+  Complete server-helper delivery and personal-renderer port acceptance remain incomplete;
+  see [mod projects](docs/mod-projects.md).
   Server Experience block storage and player focus use bound world instances, with opening
   generations that invalidate stale callback work and migration from dimension-keyed stores.
   Guest world definitions and creation, coordinated player transfers and world-epoch readiness,
@@ -1020,9 +1041,20 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   to validated naga modules, with calls ordered after forward declarations and generated
   helpers. Compatibility rewriting accepts empty top-level declarations, defers square roots
   of negative float literals, separates shared-memory array declarations, sizes unsized
-  arrays from their constructors and folds typed scalar constants in array bounds. Missing vertex
+  arrays from their constructors and folds typed scalar constants in array bounds.
+  Function-local variables named after a struct type (`Face Face = ...;`) are renamed for the
+  rest of the scope in which they hide that type. Missing vertex
   varying locations receive zero outputs. Unresolved vertex variables receive numeric
   declarations from used fragment inputs, with zero initialization at user main entry.
+  `sampler2D` uniforms Iris does not bind read texture unit 0 as in Iris: `colortex0` in
+  full-screen and compute passes, the block atlas in geometry passes. Geometry texture
+  image overrides share one binding across `tex`, `texture`, `gtexture` and `u_MainSampler`,
+  including reads through unbound sampler names. Sampler resolution normalizes legacy
+  names, then selects exact custom images, exact raw directives, plain unit overrides,
+  built-in textures and finally the unit-zero fallback. Images and raw textures keep
+  distinct reflected keys. Raw directives match the normalized name and shape, leaving
+  other samplers on their original texture. Earlier stage flips release plain buffer
+  overrides without releasing exact image or raw bindings.
   Iris preprocessing recovers empty expanded conditions, malformed conditional macro
   directives and unclosed groups at end of source. Settings properties keep their directive
   diagnostics. Compiler results carry shader modules without duplicate validation data;
