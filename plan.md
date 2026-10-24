@@ -128,6 +128,10 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
   until exact face-coverage behavior is verified separately. Inventory fences draw the
   native two-post shape. Walls now use the custom carried two-post shape, and vanilla
   gate item meshes turn into the custom carried axis. Native wall/gate inventory parity
+  and fresh integrated-frame acceptance remain unverified. World bamboo fences stretch the
+  native post and slat texture regions; their inventory icon still uses ordinary fence UVs,
+  bamboo fence gates still use ordinary gate UVs instead of native `_trySetFenceGateTexture`
+  regions, and world fence rails still omit the outer end faces native tessellation draws.
   and fresh integrated-frame acceptance remain unverified; bamboo fence slats are also open, and
   world fence rails still omit the outer end faces native tessellation draws.
   World walls preserve the central post outside postless straight pairs, merge those pairs
@@ -395,9 +399,25 @@ and rendered qualification remain incomplete.
   including remote/local playback and session lifecycle.
   Ordinary third-person items select separate main- and offhand grips, including native
   weapon sprites and custom-model icon fallbacks.
+  Dropped crossed plants, lanterns, chains, torches, bamboo, coral fans, rails, leaf litter,
+  resin clumps, hooks, ladders, lily pads, sea pickles, candles and metal bars use their carried
+  sprites; falling blocks retain their world models.
+  Implemented dropped sprite families, including flower beds, use their carried artwork.
+  Other drop classes and native poses remain incomplete. Falling blocks retain their world models.
+  Dropped crossed plants, lanterns, chains, ladders, lily pads, sea pickles and powered rails use their carried sprites; falling blocks retain their world models.
+  Dropped crossed plants, lanterns, chains, bamboo, coral fans, rails, leaf litter, resin clumps,
+  hooks, ladders, lily pads, sea pickles, levers, vines, glow lichen and sculk veins use their
+  carried sprites; falling blocks retain
+  their world models.
+  Dropped crossed plants, lanterns, chains, torches, bamboo, coral fans, rails, leaf litter,
+  resin clumps, hooks, ladders, lily pads and sea pickles use their carried sprites; falling
+  blocks retain their world models.
   Dropped crossed plants, lanterns, chains, ladders, lily pads and sea pickles use their carried sprites; falling blocks retain their world models.
+  Held lecterns reuse the placed stand; their hand pose comparisons remain incomplete.
   Held heads reuse the placed-head meshes and textures; their native hand pose, scale,
   inventory preview and resource-pack geometry acceptance remain incomplete.
+  Held copper golem statues reuse the standing entity geometry with their oxidation artwork;
+  stack poses, eye lighting and native hand transforms remain incomplete.
   Held maps submit server image updates over runtime pack paper in either hand.
   Received map data remains available for the session; missing map data leaves only
   the arms visible while the shared request is pending.
@@ -412,7 +432,8 @@ and rendered qualification remain incomplete.
   and matched inventory/held-item presentation. Egg and frogspawn inventory items use their
   carried sprites; remaining special shapes and animation still need matched comparisons.
   Crystal and spike items use their flat carried sprites.
-  Hooks, eyeblossoms and pitcher plants use carried sprites in slots and either hand; their dropped presentation remains incomplete.
+  Hooks, eyeblossoms and pitcher plants use carried sprites in slots and either hand;
+  dropped eyeblossoms and pitcher plants remain incomplete.
   Shulker previews apply each face brightness once.
   Lectern previews turn their reading surface toward the viewer.
   Furnace-family previews use their authored carried front faces.
@@ -497,18 +518,26 @@ ticks; dragon breath retains its five-tick emitter. Legacy emission and matched
 rendered-frame qualification remain open.
 
 Actor art keeps its alpha when every material drawing it alpha-tests, or any blends or
-lights by it; otherwise alpha rounds at 0.5. Generated declaration states cover the pinned entity material vocabulary except cushion.
-They preserve emissive body and invisible-eye alpha, culling, blending, depth comparison
-and target-channel writes. These states are provisional (older declaration, current
-behaviour unverified); current shader and rendered-frame qualification remain open.
-Cushion retains provisional rounding until its declaration is available.
-Render-controller material arrays and ternaries remain incomplete.
-Frames with Equal-depth actor overlays keep actors on native rendering so pack vertex
-transforms cannot separate their depth surfaces. Paired dissolve materials retain their dedicated renderer contracts; applying their
-generated states to held and worn presentations remains incomplete.
-Each rig geometry routes to the texture its own selection draws, else the
-default branch. The samples omit the iron golem's body controller; it is completed from
-the pack's default controller until a pinned pack defines it.
+lights by it; otherwise alpha rounds at 0.5. Generated declaration states cover the
+pinned entity material vocabulary except cushion. They preserve emissive body and
+invisible-eye alpha, culling, blending, depth comparison and target-channel writes.
+These states are provisional (older declaration, current behaviour unverified);
+current shader and rendered-frame qualification remain open. Cushion retains
+provisional rounding until its declaration is available. Invisible body and eye
+layers require the actor's render-when-invisible flag; material flags do not bypass
+that visibility gate.
+Frames with Equal-depth actor overlays keep actors on native rendering so pack
+vertex transforms cannot separate their depth surfaces. Paired dissolve materials
+retain their dedicated renderer contracts; applying their generated states to held
+and worn presentations remains incomplete.
+Each rig geometry routes to the texture its own selection draws, else the default
+branch. Whole-model material arrays and ternaries retain one controller layer and
+evaluate each material decision once, after activation and before authored part
+visibility. Render-controller expressions share frame dependency analysis, keeping
+camera-driven choices live between ticks. Dynamic per-bone material rules, selector
+admission and in-world qualification remain incomplete. The samples omit the iron
+golem's body controller; it is completed from the pack's default controller until a
+pinned pack defines it.
 
 Remaining qualification includes attachables and custom item models, action/use timing,
 projectile interpolation and shake, sleep/mount poses, name tags (including over
@@ -685,7 +714,8 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   Cinnangles Sans font without a typeface selector; font sizing applies directly and
   obsolete saved typeface values are ignored. Chat and mention colors apply to decoded
   message labels without changing server pack inputs. Mention tokens preserve surrounding
-  formatting; local-player target matching and full mention acceptance remain incomplete.
+  formatting and match the current local display name or the all-player mention. Full
+  live mention acceptance remains incomplete.
   Emote filtering and narration remain unavailable and store preferences only.
   Offline rendered fixtures cover the panel, values, palettes and reset confirmation;
   live input acceptance remains incomplete. Font size 5–20/default 10 and spacing
@@ -808,10 +838,10 @@ offers no NetherNet route, so the join fails with an explanation instead of conn
 Startup logs report milestone elapsed times and child-process CPU time when available.
 Native and translated BDS startup overlaps host-profile loading and confirms any changed
 operator grant before reporting running; container servers still resolve it before launch.
-Translated BDS starts the most recently played world in the background once the menu is up.
-A left world's server keeps running for five minutes; both stay hidden until opened, and other
-opens, edits, deletes and exits stop them first. Emulator APK acceptance of the hidden start,
-physical-phone battery cost, startup profiling and the ten-second join target remain open.
+Saved BDS worlds start only on an explicit open. Leaving requests a save and stop immediately;
+reopening waits for the previous server's save and cleanup. Android setup still prepares reusable
+startup code in an isolated temporary world. Full APK and physical-phone lifecycle acceptance,
+battery cost, startup profiling and the ten-second join target remain open.
 
 See [local worlds](docs/local-worlds.md).
 
@@ -905,7 +935,11 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   while preserving keyboard control. Device-window regression coverage does not close
   physical-phone navigation, cutout or gameplay acceptance.
   Android pack, mod, skin and cape imports open the system document picker and copy the
-  chosen documents into app cache storage before importing them; device acceptance and skin
+  chosen documents into app cache storage before importing them, then release each copy after
+  import or rejection. Mod update downloads stage in app-owned storage. Mod installation uses a
+  no-overwrite rename instead of a hard link, which Android forbids; device acceptance and skin
+  chosen documents into app cache storage before importing them. Mod installation and resource-pack
+  cache publication use a no-overwrite rename instead of hard links; device acceptance and skin
   imports that need a sibling geometry file remain open.
   Keep browser gesture activation and background work within the host's event-loop rules.
   Touch-capable hosts expose persisted look sensitivity and control guidance. A utility dropdown, chat and pause share a centered row; the dropdown toggles Debug Overlay and Player List and opens Emotes; inventory access follows the HUD hotbar. The default joystick-and-crosshair layout uses proportional movement/action centers and height-based sizes. Touchscreen settings offers a touch-control layout draft with dragging, alignment guides, snapping, grid, touch-accessible Undo/Redo, Save, Cancel and Reset; saved positions drive both artwork and hit regions. The sensitivity curve, movement/action parity, alternate touch profiles, remapping, cutout handling and physical-device layout acceptance remain open.
@@ -920,6 +954,14 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   same-dimension-type transfers. Size-bounded notices bypass data credits when their
   epoch exceeds the last acknowledged notice; equal and older epochs drop silently.
   Acknowledged epochs advance before transport handoff, allowing the next notice
+  during a pending flush. Only acknowledgments of queued notices bypass server data
+  credits; replayed acknowledgments consume the normal budget. One connection-owned state machine queues
+  every committed admission, including repeated placements in the same instance, and
+  publishes notices in order when active. Acknowledgments retire notices through their
+  admission revision; aborting a preparation preserves every committed notice. Messages
+  remain fenced until preparation ends and the notice queue is empty. Write failures
+  end the optional session without retry timers. A two-world example uses upstream Dragonfly. Cold-client bundle hosting, generated application
+  Go message bindings and live multi-client transfer qualification remain incomplete.
   during a pending flush. Only the outstanding notice's acknowledgment bypasses
   server data credits; replayed acknowledgments consume the normal budget. The
   server coalesces rapid transfers to the latest desired world, sending its next
@@ -928,24 +970,51 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   example uses upstream Dragonfly. Cold-client bundle hosting and live multi-client transfer qualification remain
   incomplete.
 - Local mods and server experiences still need runtime/input isolation, reload/reorder/
-  removal, consent, custom screen transitions and media qualification. Unmeasured shared
+  removal, consent, custom screen transitions and media qualification. Source polling
+  reuses immutable source bytes and verified packages while their selected files retain the
+  same identity and change timestamps, with content revalidated every two seconds (four
+  normal polls) to catch writes with unchanged metadata on every platform. Unmeasured shared
   blur, element blur, route exits and current-world visual integration remain incomplete.
   Source-driven mod projects generate typed Rust/Go messages, registry confirmation,
-  compile-checked asset constants and signed bundles through `devtool mod new/build`.
+  compile-checked asset constants and paired `.cmod` packages through `devtool mod new/build`.
+  Typed block/item declarations generate server registration and ordinary packs; installation
+  feeds the existing local-server hosts, and `mod run` builds an isolated development loop.
   Each recipient retains messages, media, input and state in one callback queue during
   registry negotiation. Generated confirmations retry after send-budget refusal and
-  expire with their connection or world epoch. A shared Rust/Go rate contract charges
+  expire with their connection or world epoch. Incompatible registries receive the server
+  fingerprint and visibly stop the client part, clearing its queued callbacks.
+  A shared Rust/Go rate contract charges
   native epochs and encoded fragment sizes, rejects impossible control batches, and
   reserves acknowledgment exemptions for outstanding notices. Confirmation replays
   the latest queued state once, then all callback kinds follow FIFO order through a fair recipient scheduler;
   traps preserve later queued work, stale world callbacks are discarded,
   and queue overflow visibly stops the affected part.
-  Complete server-helper delivery and personal-renderer port acceptance remain incomplete;
+  Full rendered development-loop, complete server-helper delivery and personal-renderer port acceptance remain incomplete;
   see [mod projects](docs/mod-projects.md).
   Server Experience block storage and player focus use bound world instances, with opening
   generations that invalidate stale callback work and migration from dimension-keyed stores.
-  Guest world definitions and creation, coordinated player transfers and world-epoch readiness,
-  typed player/instance stores, player lifecycle events and live transfer acceptance remain incomplete.
+  Server WIT 0.8 adds registered world definitions, instance creation/unload, typed scoped state,
+  player observations and a transfer coordinator with departure epochs and source recovery.
+  Coordinator moves, native teleports, sampled world swaps and reconnect placement use one admission path.
+  Its session-pinned transport fences old input and sends; same-instance transfers explicitly
+  synchronize position. Client-part activation shares that session's preparation and acknowledgment
+  fence, which is retired on disconnect. Relocation state clears on every exit; a failed optional
+  notice ends client-part authority without blocking native placement or later transfers.
+  Pending logins stay separate from admitted sessions,
+  so rejected duplicates preserve the connected player’s transport. Player saves resolve stable
+  instance identities with a default-spawn fallback. Pending logins reserve their destinations
+  through the handshake and revalidate before spawn; completion or failure releases only that
+  login’s reservation. Unload also respects connected players and prepared transfers.
+  Unload completes idempotent resource release after unbinding, even if its caller is cancelled.
+  Durable records use synced atomic replacement; validated world metadata stays untouched.
+  Opening fresh temporary terrain discards stale placement records and refunds their quota while
+  retaining scoped state. Shutdown drains leave callbacks before store flush and world closure, including after worker cancellation;
+  interrupted callbacks stay owned for drain retries, and undelivered final leaves fail the drain.
+  Host cancellation retires the interrupted helper without consuming guest strikes or restart attempts;
+  only guest budget and protocol failures consume strikes, while transport failures recover separately.
+  Leave writes need no live world. Player callbacks retain the world tick captured with each observation.
+  Client epoch receipt, rendered destination readiness, crash recovery and live transfer acceptance
+  remain incomplete.
 - Native click caps and local weather overrides have transactional host APIs and
   offline behavior coverage; populated-world interaction and rendering acceptance
   remain unverified.
