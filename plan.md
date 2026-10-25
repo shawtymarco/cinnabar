@@ -242,20 +242,59 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
   remesh against current frame/join/streaming budgets. Attribute decode, light readiness,
   queue wait, worker time, upload, submission and present latency independently.
   Ordinary meshing now rechecks higher-priority deferred revisions within a bounded
-  poll budget, with backoff while neighbours or light remain unavailable. Hardware
-  dirty-to-visible latency qualification remains open. Empty-section evidence and
+  poll budget, with backoff while neighbours or light remain unavailable. Completed light
+  members coalesce dependency notifications alongside ready and deferred candidates without
+  preparing geometry. All three queues share bounded camera refresh and retirement across
+  queue generations. Before geometry dispatch, ranked notifications receive readiness
+  checks within the existing work limit once worker capacity exists. Their deferred owner
+  returns to ready only when its known halo is current, owed neighbours have arrived and
+  output credit is available, so blocked notifications leave ready geometry eligible.
+  This includes distant geometry outside direct camera
+  probes. Hardware dirty-to-visible latency
+  qualification remains open. Empty-section evidence and
   withdrawals use their separate allowance without spending geometry credits;
   both still share the frame operation cap. Ready air and withdrawals bypass geometry
   scheduler ingress and receive bounded service before decode and lighting, using the
   same publication limits and poll deadline. Staged worker completions receive a bounded
-  share first, so fresh removals cannot starve staged empty or geometry results.
+  share first, so fresh removals cannot starve staged empty or geometry results. Geometry
+  preparation waits for worker and result capacity while urgent reserves and independent
+  removals retain service. Eviction skips a second removal for settled air with an
+  acknowledged GPU publication; dirty or unfinished sections still publish removals.
+  Biome-only heights without section or publication ownership skip withdrawals;
+  surviving meshes still invalidate when their sampled biome data retires.
+  Changed lighting also preserves settled air's empty publication; first empty
+  receipts and unfinished removals still receive service.
+  Model output reservations share meshing's template-selection policy: fixed models
+  reserve their own compound chains and neighbour-selected models keep a conservative
+  allowance. Resource reloads refresh these bounds while retaining existing output
+  credits. The shared output-memory limit is unchanged.
   Late blob replies for retired transactions no longer discard valid, still-needed
   blobs in the same response. Verified requested bodies arriving after ordinary-lane
-  retirement can warm the cache for recovery. Sustained high-speed hardware qualification
-  remains open.
+  retirement can warm the cache for recovery. Terrain requests use a packet origin
+  that fits their absolute positions and leave distant columns queued for later packets.
+  Failed sends restore demand, and view retirement still cancels stale columns.
+  Sustained high-speed hardware qualification remains open.
+  retirement can warm the cache for recovery. Unresolved cached SubChunk replies have a
+  session recovery timer that retries exact missing heights and preserves valid late bodies.
+  Full cached columns retain their original biome and inline data while waiting for bodies;
+  SubChunk recovery cannot replace that complete payload. Fresh recovery replies can request
+  expired shared misses again. This interval is an internal liveness policy. Recovery of a
+  permanently missing full-column body and sustained high-speed hardware qualification
+  remain open.
   Sparse startup can complete without a publisher update after terrain decodes, stream
   and render work drain, and a later GPU frame completes. Empty-world initialization is
-  verified; complete server-form and gameplay acceptance remains open.
+  verified; complete server-form and gameplay acceptance remains open. Column light
+  batches reuse one resident sky-ceiling scan for section snapshots and boundary
+  waiters. Dispatched light members retire their queued candidates, so completed
+  columns do not consume later dispatch scans. Changed light faces return pending
+  neighbours to readiness without replacing their revision or queue age. Completing
+  an adjacent solve also wakes excluded neighbours when their shared face is unchanged.
+  Near publication receipts consume changed residency columns between full snapshots,
+  preserving unchanged receipts.
+  Foreground chunk-data offload requires a full allocation of service polling;
+  idle waits do not count. Biome-only inline updates preserve current light while
+  remeshing tint; block changes and new residency still invalidate light.
+  Matched-output hardware preparation and streaming qualification remain open.
 - [ ] Close mesh-neighbour readiness acceptance with slow-delivery and seam coverage.
   Distinguish eligible horizontal columns from the provisional full-neighbour/quiet-time
   fallback; its timeout is not established native behavior.
@@ -884,10 +923,21 @@ native packet order remains incomplete.
 
 ### Held block placement
 
-Held placement still needs confirmation of direction/face/intercept retention, repeat
-timing and reset behavior across slot/item changes, unavailable selection and deferred
-presses. Empty hands and non-block items repeat a block's own interaction; bucket
-repeats and item-specific uses on blocks remain incomplete. Preserve the explicit incomplete scope in the
+Held placement retains complete ordinary/liquid frame picks in arrival order and consumes
+that buffer once before simulation. Repeats refresh bounded stored intercepts, preserve
+eligible original-hit fallback, and may retry later observations while the unchanged
+native deadline remains due. Locked-line support does not receive a second centre-distance
+filter. Ordinary and liquid queries retain their availability independently. Refreshed
+indirect support can become a direct top-face hit. Placement shares the same upcoming-tick
+item category cooldowns with air use and starts them only after transport admission.
+Regression coverage includes buffered aims, bounded float segments, same-tick retries,
+category expiry and actor lifetime/streaming boundaries. The focused app and domain
+suites pass. A headless local-server bridge comparison reproduces the old fall and keeps
+the fixed player supported; live native-client and wider placement acceptance remain open.
+Direction/face/intercept retention, repeat timing and reset behavior across slot/item
+changes, unavailable selection and deferred presses still need confirmation. Empty hands
+and non-block items repeat a block's own interaction; bucket repeats and item-specific
+uses on blocks remain incomplete. Preserve the explicit incomplete scope in the
 [held-placement reference](docs/reference/held-block-placement.md).
 
 See [inventory ownership](docs/architecture/inventory.md),
@@ -935,6 +985,8 @@ Local imports, decompression, UI/text expansion, language memory and other admis
 still need version-matched verification; the limit inventory closes no whole-client parity gate.
 Pack JSON whose value tree could need more than 1 GiB is refused before parsing, so a
 small archive cannot inflate into an allocation abort; that memory bound is an unverified limit.
+Pack JSON preserves raw control characters inside strings, including multiline manifest
+descriptions, through the shared parser used by local import and installed-pack admission.
 
 Cosmetics require live authenticated multi-account acceptance, catalog/motion envelope
 coverage, supported slot/ownership enforcement, player-preview acceptance and hardware
@@ -1013,6 +1065,10 @@ and other threads' stacks.
 Linux updates support writable AppImages and extracted AppDirs, including `install.sh`
 installations, with verified extraction and startup rollback. Packaged Linux update and
 rollback acceptance on a desktop remains incomplete.
+Updates settings keep channel selection, fresh checks, measured download progress and
+restart actions together. Explicit older-channel switches retain signature and hash checks,
+require a restart action and bind consent to the installed version and build.
+Packaged channel-switch and downgrade acceptance on macOS, Linux and Windows remains incomplete.
 Launching a retained Linux manual download can offer installation into the existing
 script-managed AppDir, after revalidating its signed manifest and image. End-to-end
 desktop acceptance of this recovery path remains incomplete.
@@ -1109,7 +1165,10 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   example uses upstream Dragonfly. Cold-client bundle hosting and live multi-client transfer qualification remain
   incomplete.
 - The Mods settings list starts with compact headers and opens one whole card at a time;
-  actions and permission details remain inside that card.
+  actions and permission details remain inside that card. Packet mods that read world data
+  need complete chunks, so their connections disable the blob cache on both login legs.
+  New packet grants take effect after reconnecting; sessions without packet mods retain
+  caching. Live server qualification remains incomplete.
   Local mods and server experiences still need runtime/input isolation, reload/reorder/
   removal, consent, custom screen transitions and media qualification. Source polling
   reuses immutable source bytes and verified packages while their selected files retain the
