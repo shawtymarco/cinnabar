@@ -33,7 +33,7 @@ const shutdownGrace = time.Second
 
 // maxFrameBytes is the largest frame body. It must equal the Rust runtime's MAX_FRAME_BYTES,
 // which TestFrameLimitMatchesRust checks against the limits fixture.
-const maxFrameBytes = 16 << 20
+const maxFrameBytes = 32 << 20
 
 // stderrLineBytes is the longest helper stderr line that is logged; the rest of a longer line is
 // dropped.
@@ -157,7 +157,7 @@ const (
 const (
 	// maxOverlayTypes is the most overlay types one Experience declares: Rust's
 	// MAX_OVERLAY_TYPES.
-	maxOverlayTypes = 128
+	maxOverlayTypes = 256
 	// maxCellOverlays is the most overlays one cell carries, in slots 0 to maxCellOverlays-1:
 	// Rust's MAX_CELL_OVERLAYS.
 	maxCellOverlays = 12

@@ -1,4 +1,5 @@
-//! The actor's inventory and the stacks a guest makes: `inventory`, `set-slot` and `drop-item`.
+//! The actor's inventory and the stacks a guest makes: `inventory`, `set-slot` and `drop-item`,
+//! and whether a break harvests, when the guest drops what its block leaves to it.
 
 use anyhow::Result;
 use experience_sdk::artifact::MAX_STACK_SIZE;
@@ -67,6 +68,13 @@ impl CallbackRes {
     pub(crate) fn inventory(&mut self) -> Result<Result<Inventory, WorldError>> {
         self.host_call()?;
         Ok(self.inventory.clone().ok_or(WorldError::PlayerUnavailable))
+    }
+
+    /// Whether this is a break that harvests: its player broke the block in a game mode that
+    /// drops what is broken.
+    pub(crate) fn harvested(&mut self) -> Result<bool> {
+        self.host_call()?;
+        Ok(self.harvest)
     }
 
     /// Stages a slot's new content, a stack the guest may make, or none; a slot written again
@@ -155,6 +163,9 @@ fn made(own: &Catalog, stack: &NewStack) -> Result<ItemStack, WorldError> {
         max
     } else {
         let max = if own.blocks.contains_key(&stack.id) {
+            if own.itemless_blocks.contains(&stack.id) {
+                return Err(WorldError::UnknownBlock);
+            }
             if stack.metadata != 0 {
                 return Err(WorldError::UnsupportedState);
             }

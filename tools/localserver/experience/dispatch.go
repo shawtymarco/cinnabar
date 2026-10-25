@@ -122,6 +122,8 @@ type event struct {
 	// actor is the player who caused the event; nil for a neighbor event.
 	actor *world.EntityHandle
 	call  Call
+	// interaction is an interaction's click, which a result that passes it on replays.
+	interaction *interaction
 	// inventory and slots retain live player observations from their owning transaction.
 	inventory *Inventory
 	slots     []item.Stack
@@ -314,7 +316,8 @@ func (h *Host) useOnBlock(
 
 // activate queues on-interact for the user's interaction. The clicked face comes from the
 // client unchecked, so a face out of range is ignored; the interaction stays consumed. A click
-// position within the cell becomes the call's hit, in pixels.
+// position within the cell becomes the call's hit, in pixels. The click and the held item are
+// kept for a result that passes the click on.
 func (h *Host) activate(
 	b Block, pos cube.Pos, clickedFace cube.Face, tx *world.Tx, u item.User, ctx *item.UseContext,
 ) {
@@ -327,7 +330,12 @@ func (h *Host) activate(
 		return
 	}
 	actor := u.H()
-	h.enqueue(b.t.exp, event{w: tx.World(), instance: instance, anchor: pos, actor: actor, call: Call{
+	click := &interaction{face: clickedFace}
+	if ctx != nil && ctx.ClickPos != nil {
+		click.pos = *ctx.ClickPos
+	}
+	click.held, _ = u.HeldItems()
+	h.enqueue(b.t.exp, event{w: tx.World(), instance: instance, anchor: pos, actor: actor, interaction: click, call: Call{
 		Interact: &InteractCall{
 			Player: actor.UUID().String(), Pos: blockPos(pos), Face: faces[clickedFace], Hit: hitOf(ctx),
 		},
@@ -380,7 +388,8 @@ func (h *Host) scheduledTick(b Block, pos cube.Pos, tx *world.Tx) {
 }
 
 // breakHandler deletes the broken block's data. A player's break then queues on-break with that
-// data; a break without a user, such as an explosion, notifies nothing.
+// data, a harvest unless the player's game mode takes nothing from what it breaks; a break
+// without a user, such as an explosion, notifies nothing.
 func (h *Host) breakHandler(b Block, pos cube.Pos, tx *world.Tx, u item.User) {
 	instance, ok := h.worlds.of(tx.World())
 	if !ok {
@@ -397,11 +406,13 @@ func (h *Host) breakHandler(b Block, pos cube.Pos, tx *world.Tx, u item.User) {
 	}
 	actor := u.H()
 	id := actor.UUID().String()
+	p, isPlayer := u.(*player.Player)
+	harvest := isPlayer && !p.GameMode().CreativeInventory()
 	h.enqueue(b.t.exp, event{w: tx.World(), instance: instance, anchor: pos, actor: actor, call: Call{
 		Break: &BreakCall{Change: Change{
 			Pos: blockPos(pos), Actor: &id, Cause: CausePlayer, BeforeID: b.t.id,
 			AfterID: blockID(tx.Block(pos)), PreviousData: previous,
-		}},
+		}, Harvest: harvest},
 	}})
 }
 

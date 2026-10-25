@@ -1,6 +1,7 @@
 //! The world-access rules of [`CallbackRes`], called directly on a prepared callback.
 
 mod client;
+mod content_rules;
 mod item_metadata;
 mod overlays;
 
@@ -34,6 +35,8 @@ const CELL: &str = "probe:cell";
 const STONE: &str = "minecraft:stone";
 const PEARL: &str = "minecraft:ender_pearl";
 const AIR: &str = "minecraft:air";
+/// A block without an item, as a content rule declares one.
+const HIDDEN: &str = "probe:hidden";
 
 const ANCHOR: BlockPos = BlockPos { x: 0, y: 64, z: 0 };
 const UP: BlockPos = BlockPos { x: 0, y: 65, z: 0 };
@@ -135,8 +138,10 @@ impl Fixture {
                     LAMP.to_owned(),
                     axes(&lamp, &[PlacementState::FacingDirection]),
                 ),
+                (HIDDEN.to_owned(), Vec::new()),
             ]
             .into(),
+            itemless_blocks: [HIDDEN.to_owned()].into(),
             items: [(CELL.to_owned(), 1)].into(),
             server: [
                 server_item(STONE, 0, 64, false),
@@ -182,6 +187,7 @@ impl Fixture {
         let own = Catalog {
             entities: Vec::new(),
             blocks: [(COUNTER.to_owned(), Vec::new())].into(),
+            itemless_blocks: Default::default(),
             items: [(CELL.to_owned(), 1)].into(),
             server: [server_item(STONE, 0, 64, false)].into(),
             recipes: Vec::new(),

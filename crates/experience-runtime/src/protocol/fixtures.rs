@@ -71,6 +71,8 @@ struct Enums {
     fail_kinds: [FailKind; 4],
     render_methods: [RenderMethod; 4],
     placement_states: [PlacementState; 4],
+    block_drops: [BlockDrops; 2],
+    block_items: [BlockItem; 3],
     placement_values: Vec<PlacementValues>,
 }
 
@@ -345,6 +347,25 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                         after_id: "minecraft:air".to_owned(),
                         previous_data: Some(hex::encode(&[0x01, 0x00, 0xff])),
                     },
+                    harvest: false,
+                },
+            )),
+        ),
+        (
+            "request_callback_break_harvest",
+            pretty(&callback(
+                2,
+                Some(player),
+                Call::Break {
+                    change: Change {
+                        pos: controller,
+                        actor: Some(player.to_owned()),
+                        cause: Cause::Player,
+                        before_id: "benergistics:glass_cable".to_owned(),
+                        after_id: "minecraft:air".to_owned(),
+                        previous_data: None,
+                    },
+                    harvest: true,
                 },
             )),
         ),
@@ -406,6 +427,8 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                         visual: None,
                         permutations: Vec::new(),
                         network: true,
+                        drops: BlockDrops::Itself,
+                        item: BlockItem::Listed,
                     },
                     BlockDef {
                         id: "benergistics:creative_energy_cell".to_owned(),
@@ -417,9 +440,12 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                         visual: None,
                         permutations: Vec::new(),
                         network: true,
+                        drops: BlockDrops::Itself,
+                        item: BlockItem::Unlisted,
                     },
                     // A cable: six connection states shown by bone visibility, a flipbook, a
-                    // placement trait and a permutation that turns it.
+                    // placement trait and a permutation that turns it. Like a cable bus, it has
+                    // no item and leaves its drops to the guest.
                     BlockDef {
                         id: "benergistics:glass_cable".to_owned(),
                         display_name: "ME Glass Cable".to_owned(),
@@ -481,6 +507,8 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                             rotation: Some(QuarterTurns { x: 0, y: 1, z: 0 }),
                         }],
                         network: true,
+                        drops: BlockDrops::Nothing,
+                        item: BlockItem::None,
                     },
                 ],
                 items: vec![ItemDef {
@@ -488,6 +516,7 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                     display_name: "1k ME Item Storage Cell".to_owned(),
                     icon: asset("item_storage_cell_1k.png"),
                     max_stack: 1,
+                    listed: false,
                 }],
                 focus: true,
                 worlds: None,
@@ -563,6 +592,7 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                                 Some(&[0x01, 0x00, 0x00]),
                             ),
                         },
+                        Op::PassInteraction {},
                     ],
                 },
             )),
@@ -652,6 +682,8 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                     BlockFace,
                     VerticalHalf
                 ),
+                block_drops: all_variants!(BlockDrops: Itself, Nothing),
+                block_items: all_variants!(BlockItem: Listed, Unlisted, None),
                 placement_values: PlacementState::ALL
                     .into_iter()
                     .map(|placement| {

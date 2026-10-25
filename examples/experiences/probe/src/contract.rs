@@ -1,12 +1,13 @@
-//! Server WIT 0.5's, 0.6's and 0.10's calls. x=24 makes each 0.5 call once; x=25 toggles a lamp;
-//! x=26 marks every member of a node's network; x=27 makes stacks; x=28 asks the server's
+//! Server WIT 0.5's, 0.6's, 0.10's and 0.12's calls. x=24 makes each 0.5 call once; x=25 toggles
+//! a lamp; x=26 marks every member of a node's network; x=27 makes stacks; x=28 asks the server's
 //! recipes; x=29 schedules updates. Using a [`BUS`] adds or removes plates on it.
 
 use experience_sdk::server::{
-    BlockDef, BlockPos, BlockState, BlockType, Callback, Face, ItemDef, ItemKey, Material, Mining,
-    NewStack, Overlay, OverlayLook, OverlayRegistration, OverlayType, OverlayVisual, Pixel,
-    PixelBox, PlacementStates, Registration, RenderMethod, StateDef, StateValue, StateValues,
-    TextureBinding, Visual, WorldError, cube,
+    BlockDef, BlockDrops, BlockItem, BlockPos, BlockRule, BlockState, BlockType, Callback,
+    ContentRules, Face, ItemDef, ItemKey, Material, Mining, NewStack, Overlay, OverlayLook,
+    OverlayRegistration, OverlayType, OverlayVisual, Pixel, PixelBox, PlacementStates,
+    Registration, RenderMethod, StateDef, StateValue, StateValues, TextureBinding, Visual,
+    WorldError, cube,
 };
 
 /// A cube with the facing placement trait and one bool state, [`LAMP_ON`].
@@ -88,6 +89,26 @@ pub(crate) fn overlays() -> OverlayRegistration {
             },
             permutations: Vec::new(),
         }],
+    }
+}
+
+/// The [`BUS`] has no item and drops nothing by itself, as AE2's cable bus; the [`NODE`]'s item
+/// and the [`CELL`] stay out of the creative inventory.
+pub(crate) fn content_rules() -> ContentRules {
+    ContentRules {
+        blocks: vec![
+            BlockRule {
+                block: BUS.to_owned(),
+                drops: BlockDrops::Nothing,
+                item: BlockItem::None,
+            },
+            BlockRule {
+                block: NODE.to_owned(),
+                drops: BlockDrops::Itself,
+                item: BlockItem::Unlisted,
+            },
+        ],
+        unlisted_items: vec![CELL.to_owned()],
     }
 }
 

@@ -133,6 +133,8 @@ pub(super) fn interact(ctx: &Callback, player: &str, p: BlockPos) -> Result<(), 
         28 => tell(&contract::craft(ctx)),
         29 => tell(&contract::schedule(ctx, p)),
         30..=35 => return worlds::interact(ctx, player, p.x),
+        // Server WIT 0.12: the click goes on to the held item, as on a block without an action.
+        36 => tell(outcome(ctx.pass_interaction())),
         x => return Err(GuestError::Rejected(format!("no probe behavior for x={x}"))),
     }
     Ok(())

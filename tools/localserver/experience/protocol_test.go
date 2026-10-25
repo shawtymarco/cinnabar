@@ -89,6 +89,8 @@ type fixtureEnums struct {
 	FailKinds       []FailKind       `json:"fail_kinds"`
 	RenderMethods   []RenderMethod   `json:"render_methods"`
 	PlacementStates []PlacementState `json:"placement_states"`
+	BlockDrops      []BlockDrops     `json:"block_drops"`
+	BlockItems      []BlockItem      `json:"block_items"`
 	PlacementValues []struct {
 		Placement PlacementState `json:"placement"`
 		State     string         `json:"state"`
@@ -243,6 +245,10 @@ func checkEnums(t *testing.T, rust *fixtureEnums) {
 	if !slices.Equal(placementStates, rust.PlacementStates) {
 		t.Errorf("Go placement states %q, Rust placement states %q", placementStates,
 			rust.PlacementStates)
+	}
+	if !slices.Equal(blockDrops, rust.BlockDrops) || !slices.Equal(blockItems, rust.BlockItems) {
+		t.Errorf("Go block drops %q and items %q, Rust %q and %q", blockDrops, blockItems,
+			rust.BlockDrops, rust.BlockItems)
 	}
 	for _, other := range []string{`"sideways"`, `"Up"`, `""`, `null`, `1`} {
 		var face Face

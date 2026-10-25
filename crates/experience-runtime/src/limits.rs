@@ -117,8 +117,9 @@ pub const MAX_LOG_BYTES: usize = 512;
 pub const MAX_ITEMS: usize = 512;
 /// Overlay types one Experience may declare. Each registers with the server as a hidden block
 /// whose every state is a palette entry, so its states weigh as a block's do (see
-/// [`MAX_BLOCKS`]); they do not count against [`MAX_BLOCKS`].
-pub const MAX_OVERLAY_TYPES: usize = 128;
+/// [`MAX_BLOCKS`]); they do not count against [`MAX_BLOCKS`]. AE2's per-side cable arms take 102
+/// types, and its other parts need room beside them.
+pub const MAX_OVERLAY_TYPES: usize = 256;
 /// Bytes of an Experience's own data on one item stack.
 pub const MAX_ITEM_DATA_BYTES: usize = 8192;
 /// Items the adapter may list as the server's when it loads an Experience.
@@ -142,10 +143,11 @@ pub const MAX_NETWORK_DATA_BYTES: usize = 524_288;
 /// inventory: at the network bounds a request measured 2.37 MB, and an inventory whose every
 /// slot holds MAX_ITEM_DATA_BYTES adds about 0.6 MB, 2.98 MB in all, which the Go adapter's
 /// TestNetworkAtItsBoundsFitsAFrame pins; truncating real AE2 networks at a smaller frame would
-/// be worse. The `loaded` answer carries every block and item definition: AE2's 13 blocks
-/// answered 569 KB, 44 KB a block and 152 KB for its largest, and `MAX_BLOCKS` blocks shaped
-/// like its 38 KB cable answer 9.4 MB with `MAX_ITEMS` items, which a test pins.
-pub const MAX_FRAME_BYTES: usize = 16 * 1024 * 1024;
+/// be worse. The `loaded` answer carries every block, item and overlay definition: AE2's 13
+/// blocks answered 569 KB, 44 KB a block and 152 KB for its largest, and `MAX_BLOCKS` blocks and
+/// `MAX_OVERLAY_TYPES` overlay types shaped like its 38 KB cable, with `MAX_ITEMS` items, answer
+/// 18.7 MB, which a test pins.
+pub const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
 
 // Hex doubles staged data, which may fill at most half of a result frame; the other half is
 // room for the remaining ops, client messages included.

@@ -153,6 +153,9 @@
           "count": 1,
           "data": "010000"
         }
+      },
+      {
+        "type": "pass_interaction"
       }
     ]
   }
