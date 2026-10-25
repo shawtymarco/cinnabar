@@ -72,7 +72,6 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       ref: ${{ steps.release.outputs.ref }}
       commit: ${{ steps.release.outputs.commit }}
-      cargo_features: ${{ steps.release.outputs.cargo_features }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -123,7 +122,6 @@ jobs:
           - { arch: x86_64, target: x86_64-apple-darwin, goarch: amd64 }
     env:
       CINNABAR_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
-      PACKAGE_CARGO_FEATURES: ${{ needs.prepare.outputs.cargo_features }}
       CARGO_BUILD_TARGET: ${{ matrix.target }}
       GOOS: darwin
       GOARCH: ${{ matrix.goarch }}
@@ -295,7 +293,6 @@ jobs:
     timeout-minutes: 120
     env:
       CINNABAR_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
-      PACKAGE_CARGO_FEATURES: ${{ needs.prepare.outputs.cargo_features }}
     defaults:
       run:
         shell: bash
@@ -446,7 +443,6 @@ jobs:
     timeout-minutes: 120
     env:
       CINNABAR_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
-      PACKAGE_CARGO_FEATURES: ${{ needs.prepare.outputs.cargo_features }}
       # Runs AppImages without FUSE.
       APPIMAGE_EXTRACT_AND_RUN: 1
       APPIMAGETOOL_URL: https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
@@ -581,7 +577,6 @@ jobs:
     timeout-minutes: 180
     env:
       CINNABAR_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
-      PACKAGE_CARGO_FEATURES: ${{ needs.prepare.outputs.cargo_features }}
       CINNABAR_ANDROID_PROFILE: release
       # Android APKs do not use the desktop symbol archive pipeline.
       CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO: "off"
