@@ -114,6 +114,7 @@ fn probe_registers_counter_block() {
             network: false,
             drops: BlockDrops::Itself,
             item: BlockItem::Listed,
+            redstone: false,
         }]
     );
 }
@@ -474,6 +475,7 @@ fn v0_1_artifact_loads_and_runs() {
             network: false,
             drops: BlockDrops::Itself,
             item: BlockItem::Listed,
+            redstone: false,
         }]
     );
     assert_eq!(

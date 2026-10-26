@@ -224,6 +224,18 @@ func (f *hostFixture) waitData(exp string, pos BlockPos, want []byte) {
 	}
 }
 
+// waitUntil waits up to within for done to hold, then fails with what describes the state.
+func (f *hostFixture) waitUntil(within time.Duration, done func() bool, what func() string) {
+	f.t.Helper()
+	deadline := time.Now().Add(within)
+	for !done() {
+		if time.Now().After(deadline) {
+			f.t.Fatal(what())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // assertData checks the data that the store holds for exp at pos.
 func (f *hostFixture) assertData(exp string, pos BlockPos, want []byte) {
 	f.t.Helper()

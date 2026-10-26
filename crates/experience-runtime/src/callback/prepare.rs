@@ -5,7 +5,10 @@ use std::sync::Arc;
 
 use block_transform::overlay_face::MAX_CELL_OVERLAYS;
 
-use super::{CallbackRes, Export, Slot, Snapshot, column, decode, entities, items, overlays};
+use super::{
+    CallbackRes, Export, Slot, Snapshot, column, containers, decode, entities, items, overlays,
+    redstone,
+};
 use crate::host::cinnabar::experience_server::types::{self as wit, CallbackInfo};
 use crate::limits::{MAX_NETWORK_BLOCKS, MAX_NETWORK_DATA_BYTES, MAX_VALUE_DEPTH};
 use crate::load::Catalog;
@@ -30,6 +33,7 @@ pub(super) fn prepare<'a>(
         snapshot,
         network,
         inventory,
+        containers,
         call,
         ..
     } = request
@@ -207,6 +211,17 @@ pub(super) fn prepare<'a>(
                     cell.pos
                 ));
             }
+            if cell.power > redstone::MAX_POWER
+                || (cell.power > 0 && !(cell.owned && own.redstone_blocks.contains(&cell.id)))
+            {
+                return Err(format!(
+                    "cell {:?} receives redstone power {}, more than {} or as no redstone block \
+                     of its own",
+                    cell.pos,
+                    cell.power,
+                    redstone::MAX_POWER
+                ));
+            }
             let slot = Slot {
                 loaded: cell.loaded,
                 id: cell.id.clone(),
@@ -214,6 +229,7 @@ pub(super) fn prepare<'a>(
                 data,
                 states: cell.states.clone(),
                 overlays: cell.overlays.clone(),
+                power: cell.power,
             };
             Ok((cell.pos, slot))
         })
@@ -225,6 +241,8 @@ pub(super) fn prepare<'a>(
     if let Some(inventory) = inventory {
         items::check_inventory(own, inventory, actor.as_deref())?;
     }
+    let centres = anchor.into_iter().chain(members.iter().copied()).collect();
+    let containers = containers::Reachable::new(own, centres, containers.as_ref())?;
     let res = CallbackRes {
         context: info.context.clone(),
         simulation: info.simulation.clone(),
@@ -249,6 +267,7 @@ pub(super) fn prepare<'a>(
         },
         network: network.clone(),
         inventory: inventory.clone(),
+        containers,
         ops: Vec::new(),
         spawned_entities: 0,
         budget: *data_budget,

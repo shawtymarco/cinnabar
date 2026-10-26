@@ -52,6 +52,8 @@ type blockType struct {
 	// item is how the block's item is offered; with ItemNone the block has no item and drops
 	// nothing by itself.
 	item BlockItem
+	// redstone is set for a block that takes part in redstone; every other block opts out.
+	redstone bool
 	// overlays is what an overlay host may carry, nil for a block that carries none; its
 	// blocks in a world are HostBlocks.
 	overlays *overlaySet
@@ -288,6 +290,10 @@ type hookSink interface {
 	scheduledTick(b Block, pos cube.Pos, tx *world.Tx)
 	// breakHandler handles the block at pos having been broken.
 	breakHandler(b Block, pos cube.Pos, tx *world.Tx, u item.User)
+	// redstonePower is the power that the redstone block at pos emits.
+	redstonePower(b Block, pos cube.Pos, tx *world.Tx) int
+	// redstoneChanged handles a change in the power that the redstone block at pos receives.
+	redstoneChanged(b Block, pos cube.Pos, tx *world.Tx)
 }
 
 // sinkHolder lets an atomic.Pointer hold a hookSink.
@@ -322,3 +328,7 @@ func (noHooks) neighbourUpdateTick(Block, cube.Pos, cube.Pos, *world.Tx) {}
 func (noHooks) scheduledTick(Block, cube.Pos, *world.Tx) {}
 
 func (noHooks) breakHandler(Block, cube.Pos, *world.Tx, item.User) {}
+
+func (noHooks) redstonePower(Block, cube.Pos, *world.Tx) int { return 0 }
+
+func (noHooks) redstoneChanged(Block, cube.Pos, *world.Tx) {}

@@ -186,6 +186,7 @@ fn unloaded_cell_is_unavailable() {
         data: None,
         states: Vec::new(),
         overlays: Vec::new(),
+        power: 0,
     };
     assert_eq!(
         outcome(&with_cell(interact(5), unloaded)),

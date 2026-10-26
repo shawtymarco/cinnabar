@@ -1,5 +1,6 @@
-//! Server WIT 0.12's content rules: what each block drops by itself and how its item is offered,
-//! and which items the creative inventory leaves out. The adapter registers what they set.
+//! Server WIT 0.12's content rules: what each block drops by itself, how its item is offered and
+//! whether it takes part in redstone, and which items the creative inventory leaves out. The
+//! adapter registers what they set.
 
 use std::collections::HashSet;
 
@@ -33,6 +34,7 @@ pub(super) fn apply(
             wit::BlockItem::Unlisted => BlockItem::Unlisted,
             wit::BlockItem::None => BlockItem::None,
         };
+        block.redstone = rule.redstone;
         ensure!(
             !(block.item == BlockItem::None && block.drops == BlockDrops::Itself),
             "block \"{id}\" has no item, so it cannot drop itself"

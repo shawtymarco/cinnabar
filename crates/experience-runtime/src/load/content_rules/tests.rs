@@ -14,6 +14,7 @@ fn block(name: &str) -> BlockDef {
         network: false,
         drops: BlockDrops::Itself,
         item: BlockItem::Listed,
+        redstone: false,
     }
 }
 
@@ -32,6 +33,7 @@ fn rule(name: &str, drops: wit::BlockDrops, item: wit::BlockItem) -> wit::BlockR
         block: format!("probe:{name}"),
         drops,
         item,
+        redstone: false,
     }
 }
 
@@ -45,17 +47,26 @@ fn rules(blocks: Vec<wit::BlockRule>, unlisted: &[&str]) -> wit::ContentRules {
     }
 }
 
-/// Rules set the drops and item of the blocks they name and unlist the items they name; the
-/// rest keep dropping themselves and stay listed.
+/// Rules set the drops, item and redstone of the blocks they name and unlist the items they
+/// name; the rest keep dropping themselves, stay listed and take no part in redstone.
 #[test]
-fn rules_set_drops_items_and_listing() {
+fn rules_set_drops_items_redstone_and_listing() {
     let (blocks, items) = apply(
-        vec![block("bus"), block("counter"), block("part")],
+        vec![
+            block("bus"),
+            block("counter"),
+            block("part"),
+            block("emitter"),
+        ],
         vec![item("cell"), item("pattern")],
         rules(
             vec![
                 rule("bus", wit::BlockDrops::Nothing, wit::BlockItem::None),
                 rule("part", wit::BlockDrops::Itself, wit::BlockItem::Unlisted),
+                wit::BlockRule {
+                    redstone: true,
+                    ..rule("emitter", wit::BlockDrops::Itself, wit::BlockItem::Listed)
+                },
             ],
             &["pattern"],
         ),
@@ -63,14 +74,15 @@ fn rules_set_drops_items_and_listing() {
     .unwrap();
     let kinds: Vec<_> = blocks
         .iter()
-        .map(|block| (block.drops, block.item))
+        .map(|block| (block.drops, block.item, block.redstone))
         .collect();
     assert_eq!(
         kinds,
         [
-            (BlockDrops::Nothing, BlockItem::None),
-            (BlockDrops::Itself, BlockItem::Listed),
-            (BlockDrops::Itself, BlockItem::Unlisted),
+            (BlockDrops::Nothing, BlockItem::None, false),
+            (BlockDrops::Itself, BlockItem::Listed, false),
+            (BlockDrops::Itself, BlockItem::Unlisted, false),
+            (BlockDrops::Itself, BlockItem::Listed, true),
         ]
     );
     let listed: Vec<_> = items.iter().map(|item| item.listed).collect();

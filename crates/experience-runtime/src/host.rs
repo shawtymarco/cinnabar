@@ -40,8 +40,8 @@ wasmtime::component::bindgen!({
 });
 
 use cinnabar::experience_server::types::{
-    BlockDef, BlockState, BlockType, CallbackInfo, Crafted, Inventory, ItemKey, LogLevel, Network,
-    NewStack, PlacementStates, WorldError,
+    BlockDef, BlockState, BlockType, CallbackInfo, Crafted, GameMode, Inventory, ItemKey, LogLevel,
+    Network, NewStack, PlacementStates, WorldError,
 };
 use cinnabar::experience_server::{diagnostics, types, types as wit, world_access};
 
@@ -740,6 +740,10 @@ impl world_access::HostCallback for HostState {
         Ok(inventory.map(Into::into))
     }
 
+    fn game_mode(&mut self, ctx: Resource<CallbackRes>) -> Result<Result<GameMode, WorldError>> {
+        self.table.get_mut(&ctx)?.game_mode()
+    }
+
     fn set_slot(
         &mut self,
         ctx: Resource<CallbackRes>,
@@ -802,6 +806,46 @@ impl world_access::HostCallback for HostState {
 
     fn pass_interaction(&mut self, ctx: Resource<CallbackRes>) -> Result<Result<(), WorldError>> {
         self.table.get_mut(&ctx)?.pass_interaction()
+    }
+
+    fn container(
+        &mut self,
+        ctx: Resource<CallbackRes>,
+        pos: BlockPos,
+    ) -> Result<Result<Vec<Option<wit::ItemStack>>, WorldError>> {
+        let slots = self.table.get_mut(&ctx)?.container(pos.into())?;
+        Ok(slots.map(|slots| slots.into_iter().map(|slot| slot.map(Into::into)).collect()))
+    }
+
+    fn set_container_slot(
+        &mut self,
+        ctx: Resource<CallbackRes>,
+        pos: BlockPos,
+        slot: u32,
+        stack: Option<NewStack>,
+    ) -> Result<Result<(), WorldError>> {
+        self.table
+            .get_mut(&ctx)?
+            .set_container_slot(pos.into(), slot, stack.map(Into::into))
+    }
+
+    fn redstone_power(
+        &mut self,
+        ctx: Resource<CallbackRes>,
+        pos: BlockPos,
+    ) -> Result<Result<u8, WorldError>> {
+        self.table.get_mut(&ctx)?.redstone_power(pos.into())
+    }
+
+    fn set_redstone_power(
+        &mut self,
+        ctx: Resource<CallbackRes>,
+        pos: BlockPos,
+        power: u8,
+    ) -> Result<Result<(), WorldError>> {
+        self.table
+            .get_mut(&ctx)?
+            .set_redstone_power(pos.into(), power)
     }
 
     /// Only reachable for an owned handle, and the guest is only ever lent a callback.

@@ -4,6 +4,7 @@
 use serde::Serialize;
 
 use super::*;
+use crate::limits::{MAX_CONTAINER_DATA_BYTES, MAX_CONTAINER_SLOTS, MAX_CONTAINERS};
 
 /// Constants the Go adapter must agree with: the frame limit, the protocol version, the limits
 /// its commit check enforces again, and the client message limits that must fit the client wire
@@ -36,6 +37,9 @@ struct Limits {
     max_geometry_bytes: usize,
     max_network_blocks: usize,
     max_network_data_bytes: usize,
+    max_containers: usize,
+    max_container_slots: usize,
+    max_container_data_bytes: usize,
     inventory_slots: usize,
     hotbar_slots: u8,
     max_items: usize,
@@ -73,6 +77,7 @@ struct Enums {
     placement_states: [PlacementState; 4],
     block_drops: [BlockDrops; 2],
     block_items: [BlockItem; 3],
+    game_modes: [GameMode; 4],
     placement_values: Vec<PlacementValues>,
 }
 
@@ -133,6 +138,7 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                     state("benergistics:powered", StateValue::Bool(true)),
                 ],
                 overlays: Vec::new(),
+                power: 0,
             },
             Cell {
                 pos: neighbor,
@@ -142,6 +148,7 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                 data: None,
                 states: Vec::new(),
                 overlays: Vec::new(),
+                power: 0,
             },
             Cell {
                 pos: BlockPos {
@@ -155,10 +162,12 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                 data: None,
                 states: Vec::new(),
                 overlays: Vec::new(),
+                power: 0,
             },
         ],
         network: None,
         inventory: None,
+        containers: None,
         call,
     };
     let result = |seq: u64, outcome: Outcome| Response::Result { seq, outcome };
@@ -191,15 +200,62 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
             hit: None,
         },
     );
+    // A double chest above the controller, listed at one half with the other as its pair, and an
+    // unloaded position beside the controller.
+    let mut chest = vec![None; 54];
+    chest[3] = Some(ItemStack {
+        id: "minecraft:iron_ingot".to_owned(),
+        metadata: 0,
+        count: 16,
+        max_count: 64,
+        data: None,
+        plain: true,
+    });
     if let Request::Callback {
-        network, inventory, ..
+        network,
+        inventory,
+        containers,
+        ..
     } = &mut networked
     {
         *network = Some(Network {
             blocks: vec![controller, neighbor],
             truncated: false,
         });
-        *inventory = Some(Inventory { selected: 0, slots });
+        *inventory = Some(Inventory {
+            selected: 0,
+            slots,
+            game_mode: GameMode::Creative,
+        });
+        *containers = Some(Containers {
+            blocks: vec![
+                Container {
+                    pos: BlockPos {
+                        x: 12,
+                        y: 65,
+                        z: -7,
+                    },
+                    loaded: true,
+                    pair: Some(BlockPos {
+                        x: 11,
+                        y: 65,
+                        z: -7,
+                    }),
+                    slots: chest,
+                },
+                Container {
+                    pos: BlockPos {
+                        x: 12,
+                        y: 64,
+                        z: -8,
+                    },
+                    loaded: false,
+                    pair: None,
+                    slots: Vec::new(),
+                },
+            ],
+            truncated: true,
+        });
     }
     let new_stack = |id: &str, count: u8, data: Option<&[u8]>| NewStack {
         id: id.to_owned(),
@@ -429,6 +485,7 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                         network: true,
                         drops: BlockDrops::Itself,
                         item: BlockItem::Listed,
+                        redstone: false,
                     },
                     BlockDef {
                         id: "benergistics:creative_energy_cell".to_owned(),
@@ -442,6 +499,7 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                         network: true,
                         drops: BlockDrops::Itself,
                         item: BlockItem::Unlisted,
+                        redstone: false,
                     },
                     // A cable: six connection states shown by bone visibility, a flipbook, a
                     // placement trait and a permutation that turns it. Like a cable bus, it has
@@ -509,6 +567,8 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                         network: true,
                         drops: BlockDrops::Nothing,
                         item: BlockItem::None,
+                        // The cable bus carries AE2's level emitter and toggle bus.
+                        redstone: true,
                     },
                 ],
                 items: vec![ItemDef {
@@ -593,6 +653,19 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                             ),
                         },
                         Op::PassInteraction {},
+                        Op::SetContainerSlot {
+                            pos: BlockPos {
+                                x: 12,
+                                y: 65,
+                                z: -7,
+                            },
+                            slot: 3,
+                            stack: Some(new_stack("minecraft:iron_ingot", 8, None)),
+                        },
+                        Op::SetRedstonePower {
+                            pos: controller,
+                            power: 15,
+                        },
                     ],
                 },
             )),
@@ -645,6 +718,9 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                 max_geometry_bytes: MAX_GEOMETRY_BYTES,
                 max_network_blocks: MAX_NETWORK_BLOCKS,
                 max_network_data_bytes: MAX_NETWORK_DATA_BYTES,
+                max_containers: MAX_CONTAINERS,
+                max_container_slots: MAX_CONTAINER_SLOTS,
+                max_container_data_bytes: MAX_CONTAINER_DATA_BYTES,
                 inventory_slots: INVENTORY_SLOTS,
                 hotbar_slots: HOTBAR_SLOTS,
                 max_items: MAX_ITEMS,
@@ -684,6 +760,7 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
                 ),
                 block_drops: all_variants!(BlockDrops: Itself, Nothing),
                 block_items: all_variants!(BlockItem: Listed, Unlisted, None),
+                game_modes: all_variants!(GameMode: Survival, Creative, Adventure, Spectator),
                 placement_values: PlacementState::ALL
                     .into_iter()
                     .map(|placement| {

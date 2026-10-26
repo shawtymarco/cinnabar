@@ -119,6 +119,14 @@ const (
 	// maxNetworkDataBytes is the most data of one callback's network, summed over its members:
 	// Rust's MAX_NETWORK_DATA_BYTES.
 	maxNetworkDataBytes = 524_288
+	// maxContainers is the most positions one callback's containers hold: Rust's MAX_CONTAINERS.
+	maxContainers = 64
+	// maxContainerSlots is the slots of the largest container, a double chest: Rust's
+	// MAX_CONTAINER_SLOTS.
+	maxContainerSlots = 54
+	// maxContainerDataBytes is the most item data of one callback's containers, summed over
+	// their stacks: Rust's MAX_CONTAINER_DATA_BYTES.
+	maxContainerDataBytes = 1 << 20
 )
 
 // The inventory's shape and the item bounds. Each must equal its Rust constant, which

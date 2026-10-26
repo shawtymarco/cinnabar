@@ -258,6 +258,7 @@ mod tests {
             network: false,
             drops: BlockDrops::Itself,
             item: BlockItem::Listed,
+            redstone: false,
         };
         let mut output = Vec::new();
         assert!(
@@ -352,6 +353,7 @@ mod tests {
                 network: true,
                 drops: BlockDrops::Nothing,
                 item: BlockItem::Unlisted,
+                redstone: true,
             })
             .collect();
         let items: Vec<ItemDef> = (0..MAX_ITEMS)

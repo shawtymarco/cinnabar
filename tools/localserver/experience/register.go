@@ -203,6 +203,7 @@ func blockTypeOf(exp string, def BlockDef, cache *assetCache) (*blockType, error
 		declared:  make(map[string][]any, len(def.States)),
 		network:   def.Network,
 		item:      def.Item,
+		redstone:  def.Redstone,
 	}
 	switch {
 	case !slices.Contains(blockItems, def.Item):

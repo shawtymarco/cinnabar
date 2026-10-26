@@ -113,6 +113,8 @@ pub struct CallbackRes {
     network: Option<Network>,
     /// The actor's inventory with the staged slots applied; none without an actor.
     inventory: Option<Inventory>,
+    /// The containers in reach of the anchor and its network, with the staged slots applied.
+    containers: containers::Reachable,
     /// In the order they commit. A position has at most one `SetBlockData`, and it comes after
     /// any `SetBlock` there.
     ops: Vec<Op>,
@@ -154,7 +156,7 @@ enum Reach {
 }
 
 /// One snapshot cell. `owned` means it holds this Experience's block, which alone has data,
-/// states and overlays.
+/// states, overlays and redstone power.
 struct Slot {
     loaded: bool,
     id: String,
@@ -162,6 +164,8 @@ struct Slot {
     data: Option<Vec<u8>>,
     states: Vec<BlockState>,
     overlays: Vec<protocol::Overlay>,
+    /// The redstone power a redstone block receives.
+    power: u8,
 }
 
 /// The export a callback calls, with its arguments.
@@ -288,9 +292,10 @@ impl CallbackRes {
         Ok(self.snapshot.read(pos).map(|slot| slot.id.clone()))
     }
 
-    /// Replaces air or an own block with air or an own block. The position loses its data and
-    /// states, so data and states staged for it are dropped; it is owned exactly when the new
-    /// block is this Experience's, which starts with its default states.
+    /// Replaces air or an own block with air or an own block. The position loses its data,
+    /// states, overlays and redstone power, so what is staged for them there is dropped; it is
+    /// owned exactly when the new block is this Experience's, which starts with its default
+    /// states.
     pub(crate) fn set_block(
         &mut self,
         pos: BlockPos,
@@ -317,6 +322,9 @@ impl CallbackRes {
             self.ops.remove(index);
         }
         if let Some(index) = overlays::overlay_op(&self.ops, pos) {
+            self.ops.remove(index);
+        }
+        if let Some(index) = redstone::redstone_op(&self.ops, pos) {
             self.ops.remove(index);
         }
         stage(
@@ -678,12 +686,14 @@ impl From<protocol::Cause> for ChangeCause {
     }
 }
 
+mod containers;
 mod craft;
 mod entities;
 mod invoke;
 mod items;
 mod overlays;
 mod prepare;
+mod redstone;
 #[cfg(test)]
 mod tests;
 

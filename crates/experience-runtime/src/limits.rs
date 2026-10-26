@@ -138,6 +138,14 @@ pub const MAX_NETWORK_BLOCKS: usize = 1024;
 /// Bytes of block data one callback's network holds, summed over its members; the adapter's
 /// flood stops before a member that would pass it and marks the network truncated.
 pub const MAX_NETWORK_DATA_BYTES: usize = 524_288;
+/// Positions one callback's containers hold: the anchor's and its network's container blocks and
+/// unloaded neighbours, in the adapter's order; it stops there and marks them truncated.
+pub const MAX_CONTAINERS: usize = 64;
+/// Slots of the largest container, a double chest.
+pub const MAX_CONTAINER_SLOTS: usize = 54;
+/// Bytes of item data one callback's containers hold, summed over their stacks; the adapter
+/// stops before a container that would pass it and marks them truncated.
+pub const MAX_CONTAINER_DATA_BYTES: usize = 1024 * 1024;
 /// Encoded JSON bytes per IPC frame, excluding the 4-byte length prefix. The frame crosses a
 /// local pipe between the adapter and the runtime. A callback request carries a network and an
 /// inventory: at the network bounds a request measured 2.37 MB, and an inventory whose every
@@ -162,6 +170,9 @@ const _: () = assert!(
     2 * (MAX_STAGED_DATA_BYTES + MAX_STAGED_OPS * MAX_ITEM_DATA_BYTES) <= MAX_FRAME_BYTES / 2
 );
 const _: () = assert!(2 * INVENTORY_SLOTS * MAX_ITEM_DATA_BYTES <= MAX_FRAME_BYTES / 4);
+// Hex doubles the containers' item data, which with their stacks fills at most a quarter of a
+// request frame; the Go adapter keeps that quarter from the network and checks it at the bounds.
+const _: () = assert!(2 * MAX_CONTAINER_DATA_BYTES <= MAX_FRAME_BYTES / 8);
 // A network-wide read: each member's id and its states or data, then the staged writes.
 const _: () = assert!(2 * MAX_NETWORK_BLOCKS + MAX_STAGED_OPS <= MAX_HOST_CALLS);
 // An index of MAX_ARTIFACT_ENTRIES entries of 512 bytes fits its file.

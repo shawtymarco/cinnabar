@@ -173,7 +173,8 @@
       ],
       "network": true,
       "drops": "nothing",
-      "item": "none"
+      "item": "none",
+      "redstone": true
     }
   ],
   "items": [

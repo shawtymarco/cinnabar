@@ -566,6 +566,9 @@ type snapshot struct {
 	// slots are the actor's inventory slots as the snapshot holds them, which the commit checks
 	// again where it writes; nil without an actor.
 	slots []item.Stack
+	// containers are the request's loaded containers as the snapshot holds them, by listed
+	// position, which the commit checks again where it writes.
+	containers map[cube.Pos]containerState
 }
 
 // cellState is the state of one snapshot cell that a commit must find unchanged, and the length
@@ -582,6 +585,9 @@ type cellState struct {
 	token    Token
 	hasToken bool
 	dataLen  uint64
+	// power is the redstone power that an owned redstone block receives. The commit does not
+	// check it.
+	power uint8
 }
 
 // snapshot reads the event's anchor and its loaded neighbors in a fresh task of the event's
@@ -659,10 +665,11 @@ func await(ctx context.Context, task *world.Task) error {
 
 // read builds the event's snapshot in tx: the anchor and its six neighbors within the world's
 // height, loaded or not, with the data of the owned ones, then the members of the anchor's
-// network; nothing for an unanchored call.
+// network and the containers in reach of both; nothing for an unanchored call.
 func (h *Host) read(tx *world.Tx, d *dispatcher, ev event) snapshot {
 	snap := h.readFixed(tx, d, ev)
 	h.network(tx, d, ev, &snap)
+	h.containers(tx, d, ev, &snap)
 	return snap
 }
 
@@ -704,6 +711,7 @@ func (h *Host) readFixed(tx *world.Tx, d *dispatcher, ev event) snapshot {
 		if st.owned {
 			cell.States = st.block.states()
 			cell.Overlays = st.overlays.list()
+			cell.Power = st.power
 			if data, ok := h.store.Data(d.id, ev.instance.storeKey(pos)); ok {
 				s := hex.EncodeToString(data)
 				cell.Data = &s
@@ -737,6 +745,9 @@ func (h *Host) cellState(tx *world.Tx, exp string, instance worldInstance, pos c
 	st.owned = ok && own.t.exp == exp && st.hasToken
 	if st.owned {
 		st.block, st.overlays = own, overlays
+		if own.t.redstone {
+			st.power = receivedPower(tx, pos)
+		}
 	}
 	return st
 }

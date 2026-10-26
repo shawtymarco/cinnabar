@@ -52,6 +52,8 @@ pub(crate) struct Catalog {
     pub blocks: HashMap<String, Vec<StateDef>>,
     /// The blocks without an item, of which no stack may be made.
     pub itemless_blocks: HashSet<String>,
+    /// The blocks that take part in redstone.
+    pub redstone_blocks: HashSet<String>,
     pub items: HashMap<String, u8>,
     pub server: HashMap<String, HashMap<u16, protocol::ServerItem>>,
     /// The server's crafting-table recipes, in the order it tries them.
@@ -286,6 +288,11 @@ fn load_dir(engine: &Engine, dir: &Path) -> Result<Loaded> {
         itemless_blocks: blocks
             .iter()
             .filter(|block| block.item == protocol::BlockItem::None)
+            .map(|block| block.id.clone())
+            .collect(),
+        redstone_blocks: blocks
+            .iter()
+            .filter(|block| block.redstone)
             .map(|block| block.id.clone())
             .collect(),
         items: items
@@ -533,6 +540,7 @@ fn validate_block(
         network,
         drops: protocol::BlockDrops::Itself,
         item: protocol::BlockItem::Listed,
+        redstone: false,
     })
 }
 
