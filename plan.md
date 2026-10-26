@@ -255,8 +255,10 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
   poll budget, with backoff while neighbours or light remain unavailable. Completed light
   members coalesce dependency notifications alongside ready and deferred candidates without
   preparing geometry. All three queues share bounded camera refresh and retirement across
-  queue generations. Before geometry dispatch, ranked notifications receive readiness
-  checks within the existing work limit once worker capacity exists. Their deferred owner
+  queue generations. Before geometry dispatch, ranked notifications from either camera
+  generation receive readiness checks within the existing work limit once worker capacity
+  exists, without waiting for unrelated queue refresh. Checked promotions use the current
+  dispatch view's rank. Their deferred owner
   returns to ready only when its known halo is current, owed neighbours have arrived and
   output credit is available, so blocked notifications leave ready geometry eligible.
   This includes distant geometry outside direct camera
@@ -303,6 +305,8 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
   columns do not consume later dispatch scans. Changed light faces return pending
   neighbours to readiness without replacing their revision or queue age. Completing
   an adjacent solve also wakes excluded neighbours when their shared face is unchanged.
+  Exact whole-output light and valid provenance equality skips repeated boundary scans
+  while the captured snapshots still match; changed outputs retain their existing scans.
   Near publication receipts consume changed residency columns between full snapshots,
   preserving unchanged receipts.
   Foreground chunk-data offload requires a full allocation of service polling
@@ -1347,7 +1351,7 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   traps preserve later queued work, stale world callbacks are discarded,
   and queue overflow visibly stops the affected part.
   Full rendered development-loop, complete server-helper delivery and personal-renderer port acceptance remain incomplete;
-  see [mod projects](docs/mod-projects.md).
+  see [mod projects](docs/modding/src/appendix/paired-projects.md).
   Server Experience block storage and player focus use bound world instances, with opening
   generations that invalidate stale callback work and migration from dimension-keyed stores.
   Server WIT 0.8 adds registered world definitions, instance creation/unload, typed scoped state,
@@ -1643,7 +1647,7 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   geometry and block/item component behavior beyond the currently supported cases.
 
 See [Android](docs/android.md), [iOS](docs/ios.md), [mods](docs/modding-spike.md),
-See [Android](docs/android.md), [mods](docs/mods/README.md),
+See [Android](docs/android.md), [mods](docs/modding/src/appendix/paired-mods.md),
 [server experiences](docs/server-experiences.md) and
 [experience runtime](docs/experience-runtime.md) for existing implementation contracts.
 
