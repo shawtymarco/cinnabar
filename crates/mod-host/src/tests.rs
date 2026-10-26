@@ -6,12 +6,44 @@ pub(crate) fn panel_surface(name: &str) -> serde_json::Value {
     serde_json::json!({"screen":format!("{name}.root"),
         "document":serde_json::json!({"namespace":name,"root":{"type":"panel"}}).to_string()})
 }
+
+/// Builds a value-editing guest that sets its panel or sparsely patches an admitted bundle.
+pub(crate) fn recovery_edit_guest(panel: &str, patch: bool) -> String {
+    let package = include_str!("../../mod-api/wit/extension.wit")
+        .lines()
+        .next()
+        .unwrap()
+        .trim_start_matches("package ")
+        .trim_end_matches(';');
+    let (name, version) = package.split_once('@').unwrap();
+    let escaped: String = panel
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("\\{byte:02x}"))
+        .collect();
+    include_str!("tests/recovery_edits.wat")
+        .replace(
+            "set-content",
+            if patch {
+                "update-content"
+            } else {
+                "set-content"
+            },
+        )
+        .replace("$INPUT", &format!("{name}/input@{version}"))
+        .replace("$SETTINGS", &format!("{name}/settings@{version}"))
+        .replace("$HUD", &format!("{name}/hud@{version}"))
+        .replace("$PANEL_INTERFACE", &format!("{name}/panel@{version}"))
+        .replace("$PANEL_JSON", &escaped)
+        .replace("$PANEL_LENGTH", &panel.len().to_string())
+}
 #[path = "tests/camera.rs"]
 mod camera;
 mod collection_reveal;
 use super::*;
 mod drawing_policy;
 mod embedded_assets;
+mod fuel_recovery;
 mod fullbright;
 mod gameplay;
 mod hud_surface;
@@ -80,7 +112,10 @@ fn trap_discards_staged_output_and_quarantines_only_this_instance() {
 #[test]
 fn fuel_stops_an_infinite_loop() {
     let (_directory, mut host) = load_fixture("(loop $forever br $forever)");
-    assert!(host.frame(false).is_err());
+    for _ in 0..crate::runtime::MAX_CONSECUTIVE_FRAME_OVERRUNS {
+        assert!(host.frame(false).is_err());
+        host.frame(false).unwrap();
+    }
     assert!(!host.is_active());
 }
 

@@ -84,6 +84,47 @@ pub(super) struct ControlState {
 }
 
 impl ControlState {
+    /// Retains panel preferences while removing references into the departed world.
+    pub(super) fn clear_world_projections(&mut self) {
+        for panel in self
+            .panel
+            .iter_mut()
+            .chain(self.pending_panel.iter_mut().flatten())
+        {
+            super::world_lifecycle::clear_surface_world(&mut panel.surface);
+        }
+    }
+
+    /// Discards failed guest writes while retaining committed preferences and native input.
+    pub(super) fn rollback(&mut self) {
+        let Self {
+            frame: _,
+            text_events: _,
+            field_events: _,
+            text_events_in_frame: _,
+            panel: _,
+            bundle: _,
+            open: _,
+            layout: _,
+            keys: _,
+            interaction: _,
+            dirty_settings: _,
+            settings: _,
+            pending_panel,
+            pending_open,
+            pending_keys,
+            pending_settings,
+            pending_interaction,
+            reads: _,
+            writes: _,
+        } = self;
+        *pending_panel = None;
+        *pending_open = None;
+        *pending_keys = None;
+        *pending_settings = None;
+        *pending_interaction = InteractionOutput::default();
+    }
+
     pub(super) fn settings(&self) -> &str {
         &self.settings
     }

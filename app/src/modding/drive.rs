@@ -161,6 +161,7 @@ pub(super) fn drive_mod(
         gameplay.apply_native_controls(effects.as_ref(), delta, &ui);
         clear_touch_buttons(&mut presentation);
         gameplay.apply_movement_intents(None, false);
+        gameplay.apply_control_modes(None);
         return;
     };
     if extension.suspended {
@@ -173,6 +174,7 @@ pub(super) fn drive_mod(
         *action_scope = None;
         gameplay.apply_native_input(None, &ui);
         gameplay.apply_movement_intents(None, false);
+        gameplay.apply_control_modes(None);
         if let Some(drawing) = drawing.as_deref_mut() {
             drawing.update(None, packet_render::session(&gameplay));
             if let Some(scene) = render_scene.as_deref_mut() {
@@ -238,12 +240,17 @@ pub(super) fn drive_mod(
     );
     extension.hosts.set_food_catalog(ui.food_catalog());
     let world_observation = gameplay.world_observation(&ui);
+    let actor_reads = (0..extension.hosts.host_count()).any(|index| {
+        let host = extension.hosts.host(index);
+        host.is_active() && (host.grants().players || host.grants().entities)
+    });
     let modules = module_observer.capture(
         &gameplay,
         &ui,
         world_observation.as_ref(),
         &player_runtime,
         Some(&interaction),
+        actor_reads,
     );
     let chat = if world_observation.is_some() {
         presentation_facts::chat_snapshot(&ui)
@@ -276,7 +283,17 @@ pub(super) fn drive_mod(
                 .map(|(_, layout)| layout),
         );
     }
-    let mut callback_failed = false;
+    let panel_owner = extension.hosts.panel_owner();
+    let panel_was_recovering = panel_owner < extension.hosts.host_count()
+        && !packets
+            .as_ref()
+            .is_some_and(|packets| packets.menu_owns_panel())
+        && extension.hosts.host(panel_owner).is_recovering();
+    let recovering_screen = extension
+        .hosts
+        .screen_owner()
+        .filter(|&owner| extension.hosts.host(owner).is_recovering());
+    let mut callback_failures = Vec::new();
     multi::run_frame_callbacks(
         &mut extension.hosts,
         multi::FrameInput {
@@ -310,15 +327,26 @@ pub(super) fn drive_mod(
             (snapshot, mobs, movement)
         },
         |index, error| {
-            callback_failed = true;
-            if let Some(registered) = &registrations[index]
-                && let Some(watcher) = watcher.as_ref()
-            {
-                watcher.quarantine(&registered.entry, error.clone());
-            }
-            warn!("Cinnabar extension callback failed: {error}");
+            callback_failures.push((index, error));
         },
     );
+    if panel_was_recovering && !extension.hosts.host(panel_owner).is_recovering() {
+        presentation.mod_ui_mut().cancel_mod_panel_edit();
+        presentation.mod_ui_mut().cancel_mod_panel_pointer_input();
+    }
+    if recovering_screen.is_some_and(|owner| !extension.hosts.host(owner).is_recovering()) {
+        presentation.mod_ui_mut().reset_mod_screens();
+    }
+    let mut callback_failed = !callback_failures.is_empty();
+    for (index, error) in callback_failures {
+        if !extension.hosts.host(index).is_active()
+            && let Some(registered) = &registrations[index]
+            && let Some(watcher) = watcher.as_ref()
+        {
+            watcher.quarantine(&registered.entry, error.clone());
+        }
+        warn!("Cinnabar extension callback failed: {error}");
+    }
     // A tapped mod that opened its panel shows it, as its toggle key would.
     extension.hosts.select_panels_opened_by_taps();
     for index in 0..extension.hosts.host_count() {
@@ -432,6 +460,7 @@ pub(super) fn drive_mod(
         &ui,
     );
     gameplay.apply_movement_intents(merged.movement_intents, captured && !absorbed);
+    gameplay.apply_control_modes(merged.control_modes);
     send_commands(network.as_deref(), ui.session_id(), merged.commands);
     if let Some(mut cues) = cues {
         cues.0 = merged.cues;

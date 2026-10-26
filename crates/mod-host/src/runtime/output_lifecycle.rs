@@ -22,6 +22,23 @@ pub(super) struct Movement {
 }
 
 impl Environment {
+    /// Drops failed override writes without revoking the last committed environment.
+    pub fn rollback(&mut self) {
+        let Self {
+            time_override: _,
+            pending_time,
+            weather_override: _,
+            pending_weather,
+            fullbright: _,
+            pending_fullbright,
+            writes,
+        } = self;
+        *pending_time = None;
+        *pending_weather = None;
+        *pending_fullbright = None;
+        *writes = 0;
+    }
+
     /// Charges all environment imports against their shared callback allowance.
     pub fn write(&mut self) -> anyhow::Result<()> {
         self.writes += 1;

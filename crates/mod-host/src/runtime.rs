@@ -2,6 +2,8 @@ mod action_filter;
 mod input_host;
 mod output_lifecycle;
 mod presentation;
+mod recovery;
+mod world_lifecycle;
 use crate::{
     CallbackOutcome, CameraDelta, FRAME_FUEL, GameplayCameraRig, GameplayMob,
     GameplayMovementSnapshot, GameplaySnapshot, MAX_LABEL_BYTES, MEMORY_BYTES, ModCue, ModEvent,
@@ -30,6 +32,8 @@ wasmtime::component::bindgen!({
 });
 
 pub(crate) const MAX_IMPORT_WRITES: u32 = 8;
+/// Consecutive frame fuel overruns before a local guest loses its session authority.
+pub(crate) const MAX_CONSECUTIVE_FRAME_OVERRUNS: u32 = 3;
 #[path = "budget_host.rs"]
 pub mod budget_host;
 #[path = "camera.rs"]
@@ -295,22 +299,25 @@ impl cinnabar::extension::clock::Host for State {
     }
 }
 
-/// An authority revocation may be rebuilt; a trapped guest requires an intentional replacement.
+/// Recoverable fuel traps retain output but cannot enter the trapped component again.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InstanceStatus {
     Running,
+    Recovering,
     Revoked,
     Quarantined,
 }
 
 pub(super) struct Instance {
     store: Store<State>,
+    pre: wasmtime::component::InstancePre<State>,
     exports: exports::Exports,
     status: InstanceStatus,
     /// Fuel the last `init` or callback consumed.
     last_fuel: u64,
     callback_budget: Option<crate::CallbackBudget>,
     filter_identity: u64,
+    consecutive_frame_overruns: u32,
 }
 
 impl Instance {
@@ -502,14 +509,17 @@ impl Instance {
         })
     }
 
-    /// Runs one callback with `fuel` and commits its output with `publish`; a trap discards
-    /// it and quarantines the guest, removing everything it presented.
+    /// Publishes only successful callbacks; frame fuel traps may retain output for recovery.
     fn run(
         &mut self,
         fuel: u64,
         publish: fn(&mut Store<State>),
         call: impl FnOnce(&exports::Exports, &mut Store<State>) -> Result<()>,
     ) -> Result<CallbackOutcome> {
+        if self.status == InstanceStatus::Recovering {
+            self.last_fuel = 0;
+            return Ok(CallbackOutcome::Deferred);
+        }
         let allowance = self
             .callback_budget
             .as_ref()
@@ -544,10 +554,12 @@ impl Instance {
             budget.refund(allowance - self.last_fuel);
         }
         if let Err(error) = called {
-            self.quarantine();
-            bail!("mod quarantined after a guest trap: {error:#}");
+            return Err(self.callback_failure(fuel, error));
         }
         publish(&mut self.store);
+        if fuel == FRAME_FUEL {
+            self.consecutive_frame_overruns = 0;
+        }
         Ok(CallbackOutcome::Executed)
     }
 
@@ -588,14 +600,22 @@ impl Instance {
         self.store.data().exclusive.refused
     }
 
-    /// Whether the guest may execute any callback.
+    /// Whether the mod retains authority, including while awaiting a fresh component.
     pub(super) fn is_active(&self) -> bool {
-        self.status == InstanceStatus::Running
+        matches!(
+            self.status,
+            InstanceStatus::Running | InstanceStatus::Recovering
+        )
     }
 
     /// Whether an authority transition stopped a previously running guest.
     pub(super) fn is_revoked(&self) -> bool {
         self.status == InstanceStatus::Revoked
+    }
+
+    /// Whether callbacks must wait for a fresh guest after a frame fuel trap.
+    pub(super) fn is_recovering(&self) -> bool {
+        self.status == InstanceStatus::Recovering
     }
 
     /// Revokes a running guest without reclassifying an existing trap as recoverable.
@@ -881,6 +901,11 @@ impl Instance {
         self.store.data().world.movement_intents
     }
 
+    /// Returns only the control modes committed by the current successful frame.
+    pub(super) fn control_modes(&self) -> Option<crate::GameplayControlModes> {
+        self.store.data().world.control_modes
+    }
+
     pub(super) fn set_session(&mut self, session: Arc<SessionData>) {
         self.store.data_mut().session = session;
     }
@@ -926,6 +951,9 @@ fn commit(store: &mut Store<State>) {
 /// an event's staged changes to those outputs are dropped by the next frame.
 fn commit_event(store: &mut Store<State>) {
     let state = store.data_mut();
+    if !state.world_output_available() {
+        state.clear_world_output();
+    }
     state.render.commit_retained();
     state.hud.commit();
     state.presentation.commit();

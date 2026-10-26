@@ -41,6 +41,14 @@ Optional grants default off in [`ModGrants`](../../crates/mod-host/src/grants.rs
 A component may request them in top-level `cinnabar:grants` JSON; requests grant
 nothing by themselves. Commands authorize only the requested names. Settings can
 revoke individual grants or all grants; permission changes reload that mod.
+
+Joining, disconnecting or changing connections creates a fresh guest so observations
+cannot carry across connection boundaries. Same-connection dimension transfers retain
+guest memory and HUD surfaces, including while world observations are unavailable.
+World drawing handles, observations and pending world output are cleared on transfer
+and rebound to the destination; mods must rebuild their world drawing. Replacements
+reuse an in-memory compiled component only for identical mod bytes and engine policy.
+Changed bytes invalidate that entry, and unloading the mod releases it.
 Explicit environment-selected components get the environment grant and opt into
 other grants with the [development switches](../../crates/client-extensions/src/modding/grants.rs).
 
@@ -263,3 +271,8 @@ cannot share a registration with gameplay/package mod authority. Grant changes
 revoke current authority; reload selects the next session's source. Optional
 `CINNABAR_PACKET_MOD_WASI=1` adds clocks, randomness and captured output, never
 files or network. See [packet WIT](../../crates/mod-api/wit/extension.wit) for callbacks.
+
+Native-frame guests must be rebuilt with the current SDK, including guests using
+only the legacy `frame` callback. The version-one JSON payload now includes look,
+movement and elapsed-time fields; older strict decoders reject these added fields
+even though the version number is unchanged.

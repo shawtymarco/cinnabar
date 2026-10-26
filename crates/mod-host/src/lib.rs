@@ -21,6 +21,7 @@ pub use runtime::cinnabar::extension::action_filter::{
     ActionFrame, ActionVerdict, FilteredAction, Held as ActionHeld, Transition as ActionTransition,
     TransitionKind,
 };
+mod compiled;
 mod component_assets;
 mod exclusive;
 mod execution;
@@ -42,12 +43,13 @@ pub use runtime::HudTextMeasure;
 pub use screens::{DataSource, KeyModifiers, LoadedPackage, ModEvent, ModScreens};
 
 pub use runtime::cinnabar::extension::gameplay::{
-    CameraPose as GameplayCameraPose, CameraRig as GameplayCameraRig, Mob as GameplayMob,
+    CameraPose as GameplayCameraPose, CameraRig as GameplayCameraRig,
+    ControlModes as GameplayControlModes, Mob as GameplayMob,
     MovementIntents as GameplayMovementIntents, MovementSnapshot as GameplayMovementSnapshot,
     Player as GameplayPlayer, Snapshot as GameplaySnapshot, Vector3 as GameplayVector3,
 };
 pub use runtime::cinnabar::extension::player_state::{
-    Actor as ActorObservation, Bounds as ActorObservationBounds,
+    Actor as ActorObservation, ActorLife, Bounds as ActorObservationBounds,
     ChatMessage as ObservedChatMessage, CombatEvent as CombatObservation, CombatKind,
     Effect as PlayerStateEffect, Food as FoodObservation, Item as PlayerStateItem,
     Motion as MotionObservation, ObservedActor, Sidebar as SidebarSnapshot, SidebarRow,
@@ -117,7 +119,6 @@ use {
     runtime::Instance,
     server_experience::{screen::ScreenLayout, session_data::SessionData},
     std::{path::PathBuf, sync::Arc},
-    wasmtime::Engine,
 };
 
 /// Maximum bytes accepted before compilation or allocation of a package buffer.
@@ -155,8 +156,7 @@ pub enum Source {
 }
 /// A developer-selected component with transactional reload and trap quarantine.
 pub struct ModHost {
-    engine: Engine,
-    _ticker: execution::EpochTicker,
+    compiled: Arc<compiled::CompiledComponent>,
     instance: Instance,
     embedded_font: Option<Arc<[u8]>>,
     embedded_logo: Option<Arc<[u8]>>,
@@ -177,6 +177,7 @@ pub struct ModHost {
     session: Arc<SessionData>,
     drawing_session: Option<mod_api::drawing::DrawingSession>,
     drawing_restart: DrawingRestart,
+    drawing_world_active: bool,
 }
 
 /// Builds an empty, unfocused control snapshot for a frame with no routed input.

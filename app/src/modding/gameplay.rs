@@ -15,6 +15,7 @@ use {crate::runtime::world::ClientWorld, client_state::SemanticInputSnapshot};
 #[derive(SystemParam)]
 pub(super) struct GameplayContext<'w> {
     pub(super) native_input: Option<ResMut<'w, super::native_input::NativeInput>>,
+    pub(super) control_modes: Option<ResMut<'w, super::ModControlModes>>,
     pub(super) world: Option<Res<'w, ClientWorld>>,
     pub(super) view: Option<ResMut<'w, LocalViewPose>>,
     pub(super) input: Option<ResMut<'w, SemanticInputSnapshot>>,
@@ -176,7 +177,7 @@ impl GameplayContext<'_> {
         player: &player_state::PlayerState,
         ui: &client_ui::ui_runtime::UiRuntime,
     ) -> Option<mod_host::PlayerStateSnapshot> {
-        if !enabled {
+        if !enabled || self.world.as_ref()?.dimension_transfer.active() {
             return None;
         }
         let authority = self.world.as_ref()?.stream.as_ref()?.authority();
@@ -319,8 +320,12 @@ impl GameplayContext<'_> {
         {
             return None;
         }
+        let world = self.world.as_ref()?;
+        if world.dimension_transfer.active() {
+            return None;
+        }
         let input = self.input.as_ref()?.snapshot()?;
-        let authority = self.world.as_ref()?.stream.as_ref()?.authority();
+        let authority = world.stream.as_ref()?.authority();
         let view = self.view.as_ref()?;
         let (yaw, pitch, _) = view.rotation().to_euler(EulerRot::YXZ);
         let eye = view.eye_translation();
@@ -370,6 +375,13 @@ impl GameplayContext<'_> {
         relayed: Option<[f32; 3]>,
         damage_shake: Option<client_presentation::camera::actor_effects::DamageShake>,
     ) -> mod_host::GameplayFacts {
+        if self
+            .world
+            .as_ref()
+            .is_some_and(|world| world.dimension_transfer.active())
+        {
+            return Default::default();
+        }
         let camera = camera.filter(|_| input_owned).and_then(|camera| {
             let (_, rotation, position) = camera.to_scale_rotation_translation();
             let (yaw, pitch, _) = rotation.to_euler(EulerRot::YXZ);

@@ -167,6 +167,19 @@ impl RenderState {
     pub fn revoke(&mut self) {
         self.masks.revoke();
         self.retained.revoke();
+        self.clear_output();
+    }
+
+    /// Invalidates guest handles while retaining the current trusted drawing observations.
+    pub(super) fn restart_guest(&mut self) {
+        self.masks.restart_guest();
+        self.retained.restart_guest();
+        self.clear_output();
+        self.compiles_left = MAX_RENDER_PASSES as u32;
+    }
+
+    /// Drops staged and published drawing from the replaced guest.
+    fn clear_output(&mut self) {
         self.staged_passes = None;
         self.staged_primitives = Primitives::default();
         if let Some(limit) = self.draw_limit {

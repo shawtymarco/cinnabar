@@ -503,6 +503,10 @@ and rendered qualification remain incomplete.
   Geometry with matching resolved inheritance chains and identical animation or controller
   definitions across pack files resolve as one. Differing duplicates (the turtle's two `move`
   controllers) still reject the rig: native file load order is unverified.
+  Local player leg cycles in both animation modes consume completed physics movement
+  and interpolate with its frame fraction, independently of remote actor ticks.
+  Linux captures cover third-person running jumps in both modes; other platforms
+  and matched native qualification remain open.
   Shulkers publish their peek and attach-face variables and keep a zero body yaw;
   attach-position snapping, peek-dependent collision bounds and a rendered comparison
   against the vanilla client remain incomplete.
@@ -1116,8 +1120,16 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   startup error through the desktop dialog or Android activity. Shader packs report a load error and
   keep native rendering when their helper kernels exceed the device's per-stage storage budget.
   The compact table still needs paging when its combined sources exceed one storage binding.
-  Physical-device rendering and fallback
-  performance acceptance remain incomplete.
+  Headless native-GPU fixtures compare completed terrain coverage across direct and indirect
+  draws and both storage layouts, including occlusion toggles and removal/reupload controls.
+  Native Android fixtures also capture completed frames through ADB, using the adapter's limits
+  while constraining the storage budget. Proprietary Adreno Vulkan drivers use direct terrain
+  draws after indirect draws produced empty frames on Adreno 619 and 750. Both devices pass the
+  coverage, occlusion and reupload fixtures with this fallback; PowerVR GE8320 also passes.
+  Mali-G57, Mali-G78 and Mali-G715 fixture pipeline compilation still crashes without completed
+  frames.
+  Full-app terrain streaming, shader-pack compatibility and fallback performance acceptance
+  remain incomplete across physical devices.
   Android packages the Dragonfly local-world server and resolves it from the APK's native-library
   directory. APKs include a translator and pinned, cached guest runtime, with BDS the default
   for new worlds. An Android-adapted GNU runtime starts BDS, creates
@@ -1214,7 +1226,11 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   removal, consent, custom screen transitions and media qualification. Source polling
   reuses immutable source bytes and verified packages while their selected files retain the
   same identity and change timestamps, with content revalidated every two seconds (four
-  normal polls) to catch writes with unchanged metadata on every platform. Unmeasured shared
+  normal polls) to catch writes with unchanged metadata on every platform. Local frame fuel
+  overruns retain committed output and recover admitted code with committed preferences on
+  the bounded loading lane; consecutive overruns quarantine the guest, and a successful frame
+  resets the count. Other guest traps still quarantine immediately. Live overrun recovery
+  qualification remains incomplete. Unmeasured shared
   blur, element blur, route exits and current-world visual integration remain incomplete.
 - Generic resolved action filtering exposes synchronous module verdicts, retained
   releases and lifecycle reconciliation; timing and rates belong to modules, and
@@ -1310,7 +1326,9 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   player-list annotation spans, damage overlay colours, per-actor overlay tints, item tooltip
   lines and clickable chat spans, merged across mods in load order. `facts` reads the pinned
   item, potion and effect tables and the installation's food; `player-state` reports the server
-  world clock and totem activations as combat events. Offline regressions cover grants, bounds,
+  world clock, totem activations as combat events and each admitted actor's life, which changes
+  on every spawn and death regardless of distance. Retained combat events also expose the actor's
+  life at commit time, with death events using the life after death. Offline regressions cover grants, bounds,
   merging, roster mapping and span placement. Tipped-arrow facts report the carried potion's
   durations until the native arrow duration is referenced, and displayed-client acceptance of
   the presentation parameters remains pending.
@@ -1333,7 +1351,8 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   remain unverified.
 - Local weather overrides have transactional host APIs and offline behavior
   coverage; populated-world interaction and rendering acceptance remain unverified.
-- Personal-mod mechanics capabilities (sprint and sneak intents, use pulses, view
+- Personal-mod mechanics capabilities (sprint and sneak intents, control modes that replace the
+  player's toggle and always-sprint settings, use pulses, view
   tilt, the relayed and presented camera positions, loaded-block search and panel
   pointer and wheel) have host and adapter regression coverage. The tilt's sign
   follows the native damage shake. Populated-world and displayed-frame acceptance
@@ -1343,7 +1362,9 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   displayed-frame pacing and complete rendering acceptance. Packet extensions now
   present guest-computed detached views, extrapolated by velocity between callbacks,
   with exactly reported look capture, movement capture and view tilt through the
-  shared camera owners; interactive flight, perspective release, teleport and tilt
+  shared camera owners. Offline regressions cover queued look and time across packet
+  callbacks, retained camera baselines beyond the submission history, and text metrics
+  across guest replacement and reload; interactive flight, perspective release, teleport and tilt
   acceptance remain unverified in a displayed client. Panel previews now
   select owner-scoped HUD cards, including preview-only cards, and share retained
   gameplay artwork. Optional measured fitting sizes and aligns their painted bounds
@@ -1351,8 +1372,9 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Focused rendering and cache regressions cover visible previews;
   populated-world and displayed-frame acceptance remain pending.
   Personal panels and HUD editor surfaces can bind the host local player's name
-- Mods draw their HUDs as JSON-UI surfaces over gameplay: each top-level control is
-  painted and cached on its own, item and projected values resolve on the host,
+- Mods draw their HUDs as JSON-UI surfaces over gameplay: independent top-level controls
+  are painted and cached on their own; roots with layered descendants or collection grids stay together
+  to preserve paint order. Item and projected values resolve on the host,
   named controls embed in the same mod's panels, updates replace single control
   definitions and rebuild only the controls reading them, and mods read text metrics,
   the HUD root, their panel's layout and their callback's remaining fuel and hide
@@ -1396,6 +1418,16 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Backdrop and element blur now limit downsampling to referenced mip levels and
   cache the admitted maximum blur. Pixel-equivalence regressions are included;
   executed GPU checks and measured frame-budget acceptance remain pending.
+  Personal-mod dimension transfers retain guest memory and HUD surfaces while fencing
+  world output and observations. Every callback suppresses world output during loading;
+  native presentation parameters reset, and world projection bindings stay hidden until
+  the guest republishes their anchors. Production-presenter regressions cover missing
+  cameras, actor despawns, loading gaps and destination rebinding. Deferred catalog
+  notifications survive while departed screen geometry and input are discarded.
+  Connection and permission changes still require fresh
+  guests; identical source replacements reuse in-memory compilation. Host regression
+  and admission timing checks cover this lifecycle; fresh live transfer acceptance
+  remains pending.
   Server-day HUD rows now consume scoped native clock observations and leave missing
   or stale clocks unknown. Clock/host regressions are included; executed checks and
   populated-world acceptance remain pending.
@@ -1409,7 +1441,9 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Its MSAA nametag composite blends against resolved scene colour, so labels partly
   occluded by world silhouettes get a dark edge fringe; per-sample composition is incomplete.
 - Experimental Java shader packs (Iris/OptiFine format) are built into every client channel.
-  Shaders start Off.
+  Shaders start Off. Terrain expansion currently needs nine compute storage buffers:
+  six packed-chunk sources plus three job, vertex-output and atlas-remap buffers.
+  Shader packs cannot load on adapters limited to eight; reducing that requirement remains open.
   Shader-only world sampling, GPU pipeline creation and pack-folder discovery
   are deferred until requested; a failed pack samples only the dimension its retry is keyed
   on, the reload key acts only with a selected pack and never lists the pack folder, and pack
@@ -1429,6 +1463,9 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Render-view admission failures reach the pack picker and restore the native renderer.
   Pipelines the device rejects, including backend compiler failures such as FXC limits on
   DX12, fail the pack load (or drop that geometry draw) instead of stopping the client.
+  DX12 and software adapters use integer-backed fused dot accumulation to preserve the
+  reference hash rounding; other hardware backends retain native fused instructions.
+  Hardware DX12 pack acceptance remains incomplete.
   Retired loads cancel between GPU batches; rapid selections share one load worker. Atlas
   builds cancel between source, pixel and upload stages, and one cancelled build retires before its
   replacement starts. Trusted helper shaders and their pipeline cache are created only when requested,

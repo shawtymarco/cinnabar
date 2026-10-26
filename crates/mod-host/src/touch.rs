@@ -7,8 +7,8 @@ use ui::mod_touch::{MAX_QUEUED_TOUCH_PRESSES, TouchButton};
 static NEXT_OWNER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 pub(super) struct TouchState {
-    /// Identifies this component instance to the host, so a tap is never delivered to a
-    /// replacement instance or another mod presenting the same button id.
+    /// Identifies this guest's touch input. Every replacement gets a new owner,
+    /// even when its published button IDs are unchanged.
     owner: u64,
     pub committed: Vec<TouchButton>,
     pending: Option<Vec<TouchButton>>,
@@ -38,6 +38,14 @@ impl Default for TouchState {
 }
 
 impl TouchState {
+    /// Invalidates old queued and captured touches while retaining published buttons.
+    pub fn restart_guest(&mut self) {
+        *self = Self {
+            committed: std::mem::take(&mut self.committed),
+            ..Self::default()
+        };
+    }
+
     /// Starts one callback's transaction and import budget.
     pub fn begin_callback(&mut self) {
         self.pending = None;

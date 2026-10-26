@@ -373,3 +373,22 @@ fn panel_actor_projections_need_actor_authority() {
     });
     assert!(granted.set_content(panel).unwrap().is_ok());
 }
+
+#[test]
+fn rollback_restores_the_committed_surface_index_before_a_guest_patch() {
+    let mut state = state(hud());
+    assert!(set(&mut state, surface(json!({"#text":"published"}))));
+    surface::set(&mut state, String::new()).unwrap().unwrap();
+    state.hud.rollback();
+    surface::update(
+        &mut state,
+        r##"{"binding_changes":{"#text":"recovered"}}"##.into(),
+    )
+    .unwrap()
+    .unwrap();
+    state.hud.commit();
+    assert_eq!(
+        state.hud.surface.as_ref().unwrap().bindings["#text"],
+        ui::mod_panel::SurfaceValue::Text("recovered".into())
+    );
+}
