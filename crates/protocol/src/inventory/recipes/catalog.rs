@@ -315,7 +315,7 @@ mod tests {
                             aux: 0,
                             count: 4,
                             block: 0,
-                            empty_envelope: false,
+                            user_data: crate::RecipeOutputData::Absent,
                         },
                         extra_outputs: Box::new([]),
                     }),

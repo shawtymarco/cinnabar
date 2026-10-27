@@ -114,10 +114,10 @@ pub use inventory::recipes::{
     BrewingItem, BrewingMix, BrewingMixItem, BrewingRecipe, MAX_RECIPE_INGREDIENTS, MultiRecipe,
     RECIPE_ANY_AUX, RECIPE_OWNED_BYTES, RecipeCatalog, RecipeDefinition, RecipeHandle,
     RecipeIdentity, RecipeIdentityHandle, RecipeIngredient, RecipeIngredientView, RecipeOutput,
-    RecipeUnlockOperation, RecipeUnlockState, RecipeUnlockUpdate, RecipeUnlockingContext,
-    RecipeUpdate, ScreenIngredient, ScreenRecipe, ScreenRecipeKind, ScreenRecipes,
-    decode_recipe_unlocks, decode_recipe_update, empty_recipe_extra, recipe_binding_supported,
-    vanilla_tag_contains,
+    RecipeOutputData, RecipeUnlockOperation, RecipeUnlockState, RecipeUnlockUpdate,
+    RecipeUnlockingContext, RecipeUpdate, ScreenIngredient, ScreenRecipe, ScreenRecipeKind,
+    ScreenRecipes, decode_recipe_unlocks, decode_recipe_update, empty_recipe_extra,
+    recipe_binding_supported, vanilla_tag_contains,
 };
 pub use inventory::{
     ARMOR_SLOTS, ARMOR_WINDOW_ID, AutoCraftIngredient, CONTAINER_NAME_CREATED_OUTPUT,
