@@ -915,6 +915,10 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   and responses, including server-pack definitions, structured text, custom controls,
   scaling and image/layout behavior against matched native views. Overlapping requests
   keep the active form and answer busy, including reused IDs.
+  Answered button and custom forms retain their rendered surface for an explicitly provisional
+  250 ms handoff grace: a replacement received in that window swaps in place, otherwise the
+  surface expires while input edges stay consumed. Version-matched native timing and visual
+  acceptance remain open.
   Busy cancellations retain every request through transport backpressure.
   Custom forms retain control locks and publish enabled bindings for the current
   game phase without removing locked response values; device acceptance remains open.
@@ -1331,6 +1335,13 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   covers drawing, every view's resident instance capacity, masks and media textures;
   retired storage releases charges without new guest snapshots. Immediate and retained
   buffers defer growth until old storage retires when both allocations cannot fit together.
+  Block-grid geometry and mesh clips have versioned contracts and resource admission.
+  Grids reuse terrain meshing, native atlas and lighting, and share unchanged section
+  output after edits. Bounded workers prepare meshes, GPU arenas and transparency order;
+  clips intersect visible masks and give their contents independent depth. Async admission
+  errors reach personal mods and helper client parts. The example exercises a three-by-three
+  chunk view with lava and has headless acceptance captures. Hardware frame-cost qualification
+  remains incomplete.
   Atmosphere and shader packs share time-override precedence:
   capture pin, personal mod, client part, then authoritative server time. Headless planet /
   star-cube rendering and F9 teardown are captured; hardware performance qualification

@@ -5974,6 +5974,7 @@ dependencies = [
  "tracing",
  "ui",
  "wasi-preview1-component-adapter-provider",
+ "wasm-encoder 0.247.0",
  "wasm-metadata",
  "wasmparser 0.247.0",
  "wasmtime",
@@ -5988,11 +5989,14 @@ dependencies = [
 name = "mod-render"
 version = "0.1.28"
 dependencies = [
+ "assets",
  "bytemuck",
+ "meshing",
  "mod-api",
  "naga",
  "serde",
  "test-alloc",
+ "world",
 ]
 
 [[package]]
@@ -7071,6 +7075,13 @@ dependencies = [
  "fdeflate",
  "flate2",
  "miniz_oxide",
+]
+
+[[package]]
+name = "portal-view-mod"
+version = "0.1.28"
+dependencies = [
+ "mod-api",
 ]
 
 [[package]]

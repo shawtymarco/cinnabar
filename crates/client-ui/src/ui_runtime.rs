@@ -49,8 +49,8 @@ pub mod sign_editor;
 pub mod use_on_identity_evidence;
 
 pub use forms::{
-    FormRespondError, FormTransportError, LocalFormAction, ServerFormEntry, ServerFormIdentity,
-    ServerFormStore, flush_form_response,
+    FORM_HANDOFF_GRACE_MILLIS, FormRespondError, FormTransportError, LocalFormAction,
+    ServerFormEntry, ServerFormIdentity, ServerFormStore, flush_form_response,
 };
 
 pub use gameplay_authority::Translator;
@@ -302,6 +302,21 @@ impl UiRuntime {
         action: LocalFormAction,
     ) -> Result<(), FormRespondError> {
         self.session.forms.respond(identity, action)
+    }
+
+    /// Answers a form and keeps its surface visible briefly for a possible server handoff.
+    pub fn respond_to_server_form_at(
+        &mut self,
+        identity: ServerFormIdentity,
+        action: LocalFormAction,
+        now_millis: u64,
+    ) -> Result<(), FormRespondError> {
+        self.session.forms.respond_at(identity, action, now_millis)
+    }
+
+    /// Advances the visual grace period after a form answer.
+    pub fn advance_form_handoff(&mut self, now_millis: u64) -> bool {
+        self.session.forms.advance_form_handoff(now_millis)
     }
 
     pub fn server_forms_mut(&mut self) -> &mut ServerFormStore {

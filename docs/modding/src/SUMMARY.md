@@ -61,6 +61,7 @@
 - [Paired project reference](appendix/paired-projects.md)
 - [Terrain reads](appendix/terrain.md)
 - [World drawing helpers](appendix/drawing-helpers.md)
+- [Block geometry and mesh clipping](appendix/block-geometry.md)
 - [Drawing materials](appendix/drawing-materials.md)
 - [Entity masks](appendix/entity-masks.md)
 - [Native packet frames](appendix/native-frame.md)

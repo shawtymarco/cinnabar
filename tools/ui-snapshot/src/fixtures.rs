@@ -104,6 +104,11 @@ pub enum Fixture {
     /// Two same-ID requests arriving while the first menu is still open.
     #[cfg(feature = "test-support")]
     FormOverlap,
+    /// An answered form after immediate retirement or during its visual handoff.
+    #[cfg(feature = "test-support")]
+    FormHandoff {
+        retained: bool,
+    },
     /// A script form shown through data-driven UI.
     #[cfg(feature = "test-support")]
     DataDriven(protocol::ddui::ScriptedScreen),

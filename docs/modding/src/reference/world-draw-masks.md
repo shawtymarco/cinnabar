@@ -2,7 +2,7 @@
 
 # World drawing: masks
 
-`cinnabar:world-draw/masks@0.1.0`
+`cinnabar:world-draw/masks@0.2.0`
 
 Retained union silhouettes. Tokens are private to one component and session.
 

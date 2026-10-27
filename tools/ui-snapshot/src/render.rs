@@ -146,6 +146,10 @@ fn png_fixture(
         return cosmetic_particles::png(state.size, *view, seconds, *emitting);
     }
     #[cfg(feature = "test-support")]
+    if let Fixture::FormHandoff { retained } = &fixture {
+        return form_overlap::handoff_png(state, dir, *retained);
+    }
+    #[cfg(feature = "test-support")]
     if matches!(&fixture, Fixture::FormOverlap) {
         return form_overlap::png(state, dir);
     }
@@ -195,6 +199,7 @@ fn png_fixture(
         | Fixture::CraftOverlap { .. }
         | Fixture::CursorDurability
         | Fixture::FormOverlap
+        | Fixture::FormHandoff { .. }
         | Fixture::DataDriven(_)
         | Fixture::SettingsDraft
         | Fixture::MenuKeyboard
@@ -247,6 +252,7 @@ fn png_fixture(
         #[cfg(feature = "test-support")]
         Fixture::CosmeticParticles { .. }
         | Fixture::FormOverlap
+        | Fixture::FormHandoff { .. }
         | Fixture::DataDriven(_)
         | Fixture::SettingsDraft
         | Fixture::MenuKeyboard
