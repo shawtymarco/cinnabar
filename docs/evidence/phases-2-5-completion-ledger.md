@@ -437,6 +437,11 @@ retained alpha/depth/UV behavior. Broader custom-model sidedness remains open.
 | Performance/resource witness | Not recorded in this row |
 | Final status | Open |
 
+Personal HUD editing belongs to the first-party mod. The host retains generic HUD
+surfaces, bounds, bindings and element visibility, plus the touch-controls editor
+backend. Touch editor placement, history and factory reflow have offline regression
+coverage; this cleanup closes no live HUD acceptance gate.
+
 Attack-category cooldown shading has owning timer and hotbar-publication regressions
 for admission rollback, shared categories and expiry. A local spear jab reproduces
 the missing overlay against the official client; broader HUD parity remains open.
@@ -547,6 +552,12 @@ Ingress uses bounded lookahead and the existing conflict tracker to admit light 
 past stalled terrain. Dependent mutations, dimension changes and transfer barriers stay
 ordered. Latency echoes flush when their movement/control fence clears. Deterministic
 regressions cover these paths; paired hardware join and transfer timings remain open.
+Scene policy reads retain root properties without resolving unused descendants.
+Deterministic coverage checks constant work, warm reuse and catalog/context changes;
+the full cold UI and hardware frame gates remain open.
+Pack publication shares dependency evidence and retires old application
+snapshots off the frame. Clone-work regression coverage does not close the
+resource-pack or hardware performance gates.
 
 Cloud preparation skips hidden geometry, prefetches finite windows on workers and
 retains GPU storage. Regression coverage checks admission frames, exact records,
