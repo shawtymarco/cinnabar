@@ -171,6 +171,7 @@ fn remote_body_and_persona_publish_sampled_clamps_and_preserve_java_overrides() 
                             partial_tick: alpha,
                             first_person: true,
                             java_mode,
+                            java_item_blocking: true,
                             combat_visuals: Default::default(),
                             sampling_camera: None,
                             aspect: 1.0,
@@ -213,6 +214,7 @@ fn remote_body_and_persona_publish_sampled_clamps_and_preserve_java_overrides() 
                         local_runtime_id: 1,
                         local_equipment: &local_equipment,
                         java_posed: &bodies.java_posed,
+                        java_item_blocking: true,
                         combat_visuals: Default::default(),
                         local_emote_pose: None,
                         remote_emote_poses: &bodies.remote_emote_poses,
@@ -258,6 +260,7 @@ fn remote_body_and_persona_publish_sampled_clamps_and_preserve_java_overrides() 
                             None,
                             alpha,
                             &mut java::PoseScratch::default(),
+                            true,
                         )
                         .unwrap();
                         assert_eq!(body.input.previous_bones, expected.bones);
@@ -540,6 +543,7 @@ fn sample_shared_bodies<'a>(
                 partial_tick: 0.5,
                 first_person: true,
                 java_mode,
+                java_item_blocking: true,
                 combat_visuals: Default::default(),
                 sampling_camera: None,
                 aspect: 1.0,

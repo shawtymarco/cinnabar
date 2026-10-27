@@ -92,6 +92,7 @@ record controls {
     panel-open: bool,
     keys-pressed: list<string>,
     keys-held: list<string>,
+    keys-admitted: list<string>,
     events: list<event>,
     pointer: option<tuple<f32, f32>>,
     wheel: f32,
@@ -105,7 +106,8 @@ record controls {
 | `gameplay` | `bool` |  |
 | `panel-open` | `bool` |  |
 | `keys-pressed` | `list<string>` | Physical non-repeat edges; pointer buttons use MouseLeft/MouseRight/MouseMiddle. |
-| `keys-held` | `list<string>` | Physical keys held this frame, including reserved ones. |
+| `keys-held` | `list<string>` | Physical keys held this frame, including reserved ones, in physical-name order.<br>Truncated to MAX_CONTROL_KEYS when more are held. |
+| `keys-admitted` | `list<string>` | Held desktop keys/buttons admitted by the finalized gameplay router, including<br>modifiers. Uses keys-held names and bounds; excludes consumed, quarantined,<br>reserved and ineligible-device controls. Empty outside gameplay input ownership.<br>Match read-bindings chords against this list, respecting modifier precedence.<br>This is physical admission, never a resolved action or permission to act.<br>Same physical-name order as keys-held, independently truncated to MAX_CONTROL_KEYS.<br>Above that held-key cap, chord resolution can differ from the host's gate. |
 | `events` | `list<event>` |  |
 | `pointer` | `option<tuple<f32, f32>>` | Pointer position in the gameplay HUD root's GUI units from its top left, the space of<br>`hud.read-viewport`, while this mod's open panel owns input; none otherwise. A panel's<br>own fitting, such as a `reference_size` scaled to a small window, does not change it. |
 | `wheel` | `f32` | Wheel notches this frame while this mod's panel owns input; positive scrolls up. |
@@ -122,6 +124,7 @@ Selects which fields to copy without changing the underlying frame or its event 
 record selection {
     keys-pressed: option<list<string>>,
     keys-held: option<list<string>>,
+    keys-admitted: option<list<string>>,
     events: bool,
 }
 ```
@@ -130,9 +133,119 @@ record selection {
 | --- | --- | --- |
 | `keys-pressed` | `option<list<string>>` | None selects all keys; some(empty) selects none; names select exact matches. |
 | `keys-held` | `option<list<string>>` |  |
+| `keys-admitted` | `option<list<string>>` |  |
 | `events` | `bool` |  |
 
+<a id="type-binding-context"></a>
+
+### `binding-context`
+
+The context in which the player assigned a physical chord.
+
+```wit
+enum binding-context {
+    gameplay,
+    ui,
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `gameplay` |  |  |
+| `ui` |  |  |
+
+<a id="type-binding-modifiers"></a>
+
+### `binding-modifiers`
+
+Modifier groups required in addition to the key; either side satisfies a group.
+
+```wit
+record binding-modifiers {
+    shift: bool,
+    control: bool,
+    alt: bool,
+    super-key: bool,
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `shift` | `bool` |  |
+| `control` | `bool` |  |
+| `alt` | `bool` |  |
+| `super-key` | `bool` |  |
+
+<a id="type-action-binding"></a>
+
+### `action-binding`
+
+One player-assigned keyboard or observable mouse-button chord. Multiple rows are
+alternative bindings. More specific satisfied chords on the same key and context
+take precedence. Keys use exactly the controls.keys-held naming contract.
+
+```wit
+record action-binding {
+    action: string,
+    context: binding-context,
+    key: string,
+    modifiers: binding-modifiers,
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `action` | `string` | Stable input Action names in kebab-case: move-forward, move-backward, move-left,<br>move-right, look-up, look-down, look-left, look-right, jump, sneak, sprint, attack,<br>use, cycle-perspective, menu, back, hotbar-1 through hotbar-9, hotbar-previous,<br>hotbar-next, ui-up, ui-down, ui-left, ui-right, ui-accept, ui-cancel, ui-tab-next,<br>ui-tab-previous, player-list, freelook, interact-with-toast, pick-item. |
+| `context` | `binding-context` |  |
+| `key` | `string` |  |
+| `modifiers` | `binding-modifiers` |  |
+
+Types: [`binding-context`](input.md#type-binding-context), [`binding-modifiers`](input.md#type-binding-modifiers).
+
+<a id="type-bindings"></a>
+
+### `bindings`
+
+A page of the player's current chords, in settings order. Total is at most
+MAX_INPUT_BINDINGS; entries has at most MAX_INPUT_BINDINGS_PER_READ rows.
+Only keyboard keys and MouseLeft/MouseRight/MouseMiddle are observable here; mouse
+axes, additional buttons, gamepads and built-in touch controls are not in keys-held.
+
+```wit
+record bindings {
+    revision: u64,
+    total: u32,
+    entries: list<action-binding>,
+}
+```
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `revision` | `u64` |  |
+| `total` | `u32` |  |
+| `entries` | `list<action-binding>` |  |
+
+Types: [`action-binding`](input.md#type-action-binding).
+
 ## Functions
+
+<a id="read-bindings"></a>
+
+### `read-bindings`
+
+```wit
+read-bindings: func(after: option<u64>, offset: u32, limit: u32) -> result<option<bindings>, string>;
+```
+
+Requires controls authority and shares read-controls' callback read allowance.
+Offset is 0 through total, and limit is 1 through MAX_INPUT_BINDINGS_PER_READ.
+Pass the last complete revision to receive none while unchanged. To collect pages,
+pass none, advance offset by each page's length and restart at zero if revision changes.
+Discard old assignments while collecting a changed revision; apply complete revisions.
+Revisions are host-local: clear guest caches on reinitialization. Returns an error
+until settings are sampled or for invalid page bounds. Does not resolve actions.
+
+Types: [`bindings`](input.md#type-bindings).
 
 <a id="demo-pressed"></a>
 

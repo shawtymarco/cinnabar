@@ -40,6 +40,18 @@ pub fn frame_simulates_tick(
         && physics.ticks_due(delta.min(MAX_FRAME_ELAPSED)) > 0
 }
 
+/// The optional Java sword-blocking override scales each travel axis once in float precision.
+pub const JAVA_BLOCKING_INPUT_SCALE: f32 = 0.2;
+
+/// Distinguishes authored item-use values from explicit local movement scales.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MovementModifier {
+    /// A server-authored item-use value, processed with Bedrock's squared float factor.
+    ItemUse(f64),
+    /// An explicit local input scale, applied once without changing raw button evidence.
+    InputScale(f32),
+}
+
 /// Immutable input and modifier facts sampled at the existing physics phase.
 pub struct PhysicsFrameInput {
     pub delta: Duration,
@@ -64,7 +76,7 @@ pub struct PhysicsFrameInput {
     pub always_sprint: bool,
     pub toggle_sneak: bool,
     pub facts: LocalMovementFacts,
-    pub item_use_modifier: Option<f64>,
+    pub movement_modifier: Option<MovementModifier>,
     pub hold: Option<PhysicsFrameHold>,
 }
 
@@ -218,8 +230,20 @@ impl LocomotionState {
                 jump.held,
                 controlled.sneaking && !facts.input_locks.blocks(ClientInputLock::Sneak),
                 controlled.sprint_request,
-                frame.item_use_modifier,
+                None,
             );
+            if active {
+                match frame.movement_modifier {
+                    Some(MovementModifier::ItemUse(value)) => {
+                        input.item_use_movement_modifier =
+                            Some(super::physics::item_use_factor(value));
+                    }
+                    Some(MovementModifier::InputScale(value)) => {
+                        input.local_input_scale = Some(value)
+                    }
+                    None => {}
+                }
+            }
             if retain_sprint {
                 input.sprinting = controlled.sprint_request;
             }

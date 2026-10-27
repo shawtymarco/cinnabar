@@ -327,7 +327,7 @@ fn maintain_attacks(
     // continues; queued work already accepted still drains and an existing destroy aborts.
     let attack_held = active
         && !item_use.vetoes_attack(&player, context.client_world.stream.as_ref())
-        && crate::ordered_interactions::held(
+        && crate::ordered_interactions::build_held(
             context.ordered.as_deref(),
             &context.input,
             Action::Attack,

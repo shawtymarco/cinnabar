@@ -215,6 +215,12 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
   semantics, complete native galleries and Windows resource correspondence remain incomplete.
 - [ ] Qualify the provisional block-entity carrier/render pass across its supported
   families, updates, animation and item contents; implementation alone closes no gate.
+  Banner patterns share immutable layer descriptions and retain texture-name scratch.
+  Animated layer arrays are reused only after readers release them; geometry and retained
+  frame regression checks do not replace native visual qualification.
+  Spawner preparation retains candidate, position, player and display scratch storage while
+  preserving scan order, visibility priority and tick advancement. Native visual and hardware
+  frame qualification remain open.
   Shulker lids still need animated collision bounds and standing-on-open-lid acceptance;
   accepting server actor displacement alone does not complete this behavior.
   Local actor displacement also needs matched interpolation-timing acceptance.
@@ -535,6 +541,9 @@ and rendered qualification remain incomplete.
 
 - [ ] `P4.3-RIGS` — Close bounded asset admission, Molang/controllers, protocol-driven
   poses, skeletal rendering and distinct tick/frame interpolation with native evidence.
+  Transactional Molang snapshots reuse cleared arrays and copy assigned slots while keeping
+  independent random streams, string ownership and write tracking. Full rendered and hardware
+  qualification of animation publication remains open.
   Geometry with matching resolved inheritance chains and identical animation or controller
   definitions across pack files resolve as one. Differing duplicates (the turtle's two `move`
   controllers) still reject the rig: native file load order is unverified.
@@ -761,6 +770,10 @@ projectile interpolation and shake, sleep/mount poses, name tags (including over
 oversized server cosmetics), capes, shadows,
 particles and equipment materials. Preserve existing accepted Java animation/cape/name-tag
 and combat-visual deviations described in [AGENTS.md](AGENTS.md).
+Java 1.7 animation settings keep the sword-blocking pose, movement slowdown and
+sprint behavior independent. Defaults preserve ordinary movement; the optional
+movement overrides apply only to held sword blocking in Java mode. Live server
+acceptance of those movement overrides remains incomplete.
 
 See [actor animation clocks](docs/reference/actor-animation-clocks.md),
 [projectile rendering](docs/projectile-rendering.md) and
@@ -785,6 +798,10 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   safe areas, focus/navigation and keyboard/mouse/controller/touch acceptance. Prove
   stable retained resources and correct supported DPI/aspect behavior. Labels share primary/backup
   face selection across measurement and painting; broader text acceptance remains open.
+  Native closed inventory binding, text measurement and layout run on a worker. Closed frames
+  serve a fixed allowance of texture metadata queries, and opening finishes pending work
+  before painting. Revision checks retain prepared results until their sources change.
+  Browser preparation and hardware warmup and first-open qualification remain incomplete.
   Rounded JSON-UI chrome supports bounded analytic box shadows with cached geometry;
   full menu visual and hardware frame-work acceptance remains open.
   Client-owned panel collections support bounded four-column card grids with
@@ -879,8 +896,10 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   block-versus-miss bands at that cap, the creative cap's shortening by the pick ray and
   actor occlusion of the block outline remain incomplete.
   Desktop input retains every transition in a complete arrival batch, including
-  repeated attack taps. Refused interaction admission and comparative combat
-  animation/audio latency acceptance remain incomplete.
+  repeated attack taps. Held mining and placement follow the latest hand-action
+  press; releasing a button does not resume an older held action. Item charging
+  retains its separate use-button handling. Refused interaction admission and
+  comparative combat animation/audio latency acceptance remain incomplete.
   Trading screens admit server offers and support purchases with manually placed inputs.
   Automatic ingredient filling, trader experience, restock and demand-price transitions,
   classic preview rich tooltips, and full item/container acceptance across trading layouts
@@ -949,7 +968,12 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   layout, so a drag-split step on the creative catalog places only the changed slots; a
   screen whose scroll content fits (bar panel suppressed) still lays out in full on each
   change, and hardware frame captures of drag splits remain open.
-  First-open and repeated-open inventory timing and combined-screen acceptance remain open.
+  Inventory preparation retains unchanged bindings and measurements across late display inputs.
+  The first visible frame starts animations and defers scroll feedback to the following frame.
+  Binding refreshes reuse paths and named sources while template identity and order stay fixed.
+  Unchanged bound output keeps its laid-out draw nodes. Draw updates retain replacement buffers,
+  and immutable vertex arrays reuse storage only after every reader releases them.
+  First-open and repeated-open hardware timing and combined-screen acceptance remain open.
 - [ ] `P5.8-SETTINGS` — Close menu, control, video and persistence acceptance. Desktop
   wiring alone does not establish native parity; language-specific scale dialogs,
   safe-zone handling, service-controlled spacing and touch/console behavior remain open.
@@ -1303,6 +1327,10 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   resets the count. Other guest traps still quarantine immediately. Live overrun recovery
   qualification remains incomplete. Unmeasured shared
   blur, element blur, route exits and current-world visual integration remain incomplete.
+- Granted mod input exposes raw physical holds, player bindings and finalized per-key
+  gameplay admission. Both held lists retain the 64-key cap with deterministic truncation;
+  overflow can differ from native gates. Desktop routing regressions cover consumption,
+  rebind quarantine, UI ownership and device changes; live input qualification remains open.
 - Generic resolved action filtering exposes synchronous module verdicts, retained
   releases and lifecycle reconciliation; timing and rates belong to modules, and
   attack and use pulses reach it as repeats. Local weather overrides retain

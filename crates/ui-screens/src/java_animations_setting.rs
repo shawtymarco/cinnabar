@@ -3,9 +3,11 @@
 use json_ui::Catalog;
 use serde_json::json;
 
-use launcher::menu::settings_options::{ANIMATION_CHOICES, ANIMATIONS_OPTION};
+use launcher::menu::settings_options::{
+    ANIMATION_CHOICES, ANIMATIONS_OPTION, layout::SettingPanel,
+};
 
-/// Uses the Graphics mode dropdown and radio templates after View Bobbing.
+/// Adds the Java animation selector and blocking controls after View Bobbing.
 pub fn install(catalog: &mut Catalog) {
     let name = ANIMATIONS_OPTION.name;
     let choices = ANIMATION_CHOICES
@@ -19,6 +21,31 @@ pub fn install(catalog: &mut Catalog) {
             })
         })
         .collect::<Vec<_>>();
+    let blocking_options = SettingPanel::VideoJavaCombat
+        .options()
+        .map(|option| {
+            json!({
+                format!("{}@settings_common.option_toggle", option.name): {
+                    "$option_label": option.label,
+                    "$option_binding_name": format!("#{}", option.name),
+                    "$option_enabled_binding_name": format!("#{}_enabled", option.name),
+                    "$toggle_name": option.name,
+                    "$focus_override_right": "FOCUS_OVERRIDE_STOP"
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut video_controls = vec![json!({
+        format!("{name}@settings_common.option_dropdown"): {
+            "$option_label": ANIMATIONS_OPTION.label,
+            "$dropdown_content": format!("general_section.{name}_dropdown_content"),
+            "$dropdown_area": "content_area",
+            "$dropdown_name": format!("{name}_dropdown"),
+            "$option_enabled_binding_name": format!("#{name}_dropdown_enabled"),
+            "$options_dropdown_toggle_label_binding": format!("#{name}_dropdown_toggle_label")
+        }
+    })];
+    video_controls.extend(blocking_options);
     let overlay = json!({
         "namespace": "general_section",
         format!("{name}_dropdown_content@settings_common.option_radio_dropdown_group"): {
@@ -29,16 +56,7 @@ pub fn install(catalog: &mut Catalog) {
                 "array_name": "controls",
                 "operation": "insert_after",
                 "control_name": "view_bobbing_toggle",
-                "value": [{
-                    format!("{name}@settings_common.option_dropdown"): {
-                        "$option_label": ANIMATIONS_OPTION.label,
-                        "$dropdown_content": format!("general_section.{name}_dropdown_content"),
-                        "$dropdown_area": "content_area",
-                        "$dropdown_name": format!("{name}_dropdown"),
-                        "$option_enabled_binding_name": format!("#{name}_dropdown_enabled"),
-                        "$options_dropdown_toggle_label_binding": format!("#{name}_dropdown_toggle_label")
-                    }
-                }]
+                "value": video_controls
             }]
         }
     });
@@ -92,6 +110,11 @@ mod tests {
             &section.children[selector],
             ANIMATIONS_OPTION.label
         ));
+        for option in SettingPanel::VideoJavaCombat.options() {
+            let position = position(option.name).expect("Java blocking option");
+            assert!(position > selector);
+            assert!(has_text(&section.children[position], option.label));
+        }
         let choices = json_ui::resolve(
             &catalog,
             &format!(

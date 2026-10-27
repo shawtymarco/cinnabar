@@ -47,6 +47,7 @@ use gameplay::block_use::{LocalUse, RepeatClock, UseSurroundings, placement_cell
 #[derive(SystemParam)]
 pub(crate) struct BlockUseContext<'w, 's> {
     input: Res<'w, SemanticInputSnapshot>,
+    ordered: Option<Res<'w, crate::ordered_interactions::InteractionRuntime>>,
     frame: Res<'w, bevy::diagnostic::FrameCount>,
     origin: Res<'w, InteractionOriginSnapshot>,
     view: Res<'w, LocalViewPose>,

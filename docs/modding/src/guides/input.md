@@ -1,6 +1,6 @@
 # Input
 
-Input comes through the `input` interface. Its controls, text and field reads and key reservations need `controls`; the demo action read, `demo_pressed`, is ungated. Everything in it is local: key names, edges and events from this machine. Reading input never synthesizes gameplay input; the request functions at the end of this guide are the narrow exceptions, each with its own grant.
+Input comes through the `input` interface. Its controls, bindings, text and field reads and key reservations need `controls`; the demo action read, `demo_pressed`, is ungated. Everything in it is local: key names, edges and events from this machine. Reading input never synthesizes gameplay input; the request functions at the end of this guide are the narrow exceptions, each with its own grant.
 
 ## Reading a frame of input
 
@@ -13,16 +13,58 @@ Call `input::read_controls` in `frame` to get this frame's `controls` record:
 | `gameplay` | Whether this mod received a gameplay snapshot this frame; it is false while a menu owns input and can also be false when your grants do not admit a gameplay snapshot |
 | `panel_open` | Whether your mod's panel is open |
 | `keys_pressed` | Physical non-repeat key edges this frame. Pointer buttons arrive as `MouseLeft`, `MouseRight`, `MouseMiddle` |
-| `keys_held` | Physical keys held this frame, including your reserved ones; keys reserved by an earlier mod are withheld |
+| `keys_held` | Physical keys held this frame, including your reserved ones; keys reserved by an earlier mod are withheld. Use for key capture |
+| `keys_admitted` | Held physical desktop keys and modifiers the finalized native router passes to gameplay in this callback |
 | `events` | Panel control events (`id`, `value`) delivered to your mod |
 | `pointer` | Pointer position in HUD GUI units, only while your open panel owns input; otherwise none |
 | `wheel` | Wheel notches this frame while your panel owns input; positive scrolls up |
 
-Key names are physical key names of at most `MAX_CONTROL_KEY_BYTES` (32) bytes, alphanumeric. At most `MAX_CONTROL_KEYS` (64) keys appear.
+Key names are physical key names of at most `MAX_CONTROL_KEY_BYTES` (32) bytes, alphanumeric. At most `MAX_CONTROL_KEYS` (64) keys appear in each list. Held and admitted keys use
+ascending physical-name order and truncate independently at that cap. With more than 64
+simultaneously held controls, action resolution from the truncated list can differ from
+the host gate. The native gate still checks its complete routed sample.
 
-When you only need part of the frame, `read_selected_controls` takes a `selection` — which `keys_pressed` and `keys_held` names to include (none selects all, an empty list selects none) and whether to include `events` — and returns the same record with the unselected fields empty. It shares the `read_controls` callback read budget, so selecting is about copying less, not reading more often.
+When you only need part of the frame, `read_selected_controls` takes a `selection` — which `keys_pressed`, `keys_held` and `keys_admitted` names to include (none selects all, an empty list selects none) and whether to include `events` — and returns the same record with the unselected fields empty. It shares the `read_controls` callback read budget, so selecting is about copying less, not reading more often.
 
 React to `keys_pressed` for actions. A held key appears in `keys_held` every frame, so treating held as pressed fires your action every frame; the examples check the host-assigned demo edge with `input::demo_pressed` for the same reason — it is true only for the current frame's action edge. If your mod must not act while a menu owns input, check `gameplay` and `focused`: input edges expire with their frame, and edges that arrive while your callback is deferred are not replayed later.
+
+## Reading the player's bindings
+
+Use `input::read_bindings(None, 0, limit)` to start reading the player's current assignments.
+A reply contains a revision, a total count (at most `MAX_INPUT_BINDINGS`) and a bounded page
+(at most `MAX_INPUT_BINDINGS_PER_READ` rows). Advance the offset by the page length until you
+have the total; restart at zero if the revision changes. Suspend action-dependent policy
+while collecting a changed revision. On later frames, pass the last complete revision to
+receive `None` while unchanged. This shares the controls read allowance; small pages let
+mods spread decoding and cache updates across callbacks.
+Each entry names an action (for example `attack`, `jump` or `use`), a gameplay/UI context,
+a physical key and required modifier groups. Alternative entries bind the same action to
+several inputs. The names are the same ones in `keys_held`, including `MouseLeft`, `KeyW`
+and `Space`. These are the player's assignments, including rebinds.
+
+A mod resolves its own action holds by matching `read_bindings` chords against
+`keys_admitted`. For each gameplay-context chord, require its key and all required modifier
+groups in that list; either left or right satisfies a modifier group. A satisfied chord
+with more required modifier groups on the same key and context takes precedence, even
+when it names another action. Equal specificity remains an alternative. Collect the
+complete binding revision before resolving actions.
+
+`keys_admitted` comes from the same finalized routing sample as the host's physical
+attack/use gates. It excludes macro-consumed keys, release quarantine after rebinds or
+ownership changes, UI barriers, reserved keys and controls excluded by the selected input
+device. A key held during a rebind can remain in `keys_held` while absent from
+`keys_admitted` until released and pressed again. Use `keys_held` for key capture, including
+reserved controls. Admission is sampled once for the callback; reservations requested
+inside that callback affect later samples. All mods see the same native admission, while
+earlier mods' reservations can also withhold raw held/pressed keys from later mods.
+
+Within the list bounds and supported desktop coverage, chord resolution agrees with the
+host's physical attack/use hold gate. A matching chord does not grant world availability,
+server permission or request authority; handle refused requests. Subsequent action filtering
+can still suppress a request after the ordinary frame callback.
+
+Only keyboard keys and the three observed mouse buttons are currently covered. Gamepads,
+built-in touch controls, mouse axes and additional mouse buttons are not in `keys_held`.
 
 ## Text input
 

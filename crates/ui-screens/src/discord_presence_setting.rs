@@ -1,19 +1,24 @@
-//! Video toggle for Discord Rich Presence, after the Animations selector.
+//! Video toggle for Discord Rich Presence, after the animation controls.
 
 use json_ui::Catalog;
 use serde_json::json;
 
-use launcher::menu::settings_options::{ANIMATIONS_OPTION, DISCORD_PRESENCE_OPTION};
+use launcher::menu::settings_options::{DISCORD_PRESENCE_OPTION, layout::SettingPanel};
 
 pub fn install(catalog: &mut Catalog) {
     let name = DISCORD_PRESENCE_OPTION.name;
+    let last_animation = SettingPanel::VideoJavaCombat
+        .options()
+        .last()
+        .expect("Java combat controls")
+        .name;
     let overlay = json!({
         "namespace": "general_section",
         "video_section": {
             "modifications": [{
                 "array_name": "controls",
                 "operation": "insert_after",
-                "control_name": ANIMATIONS_OPTION.name,
+                "control_name": last_animation,
                 "value": [{
                     format!("{name}@settings_common.option_toggle"): {
                         "$option_label": DISCORD_PRESENCE_OPTION.label,
@@ -31,12 +36,9 @@ pub fn install(catalog: &mut Catalog) {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        launcher::menu::settings_options::{ANIMATIONS_OPTION, DISCORD_PRESENCE_OPTION},
-    };
+    use {super::*, launcher::menu::settings_options::DISCORD_PRESENCE_OPTION};
 
-    /// The toggle follows the Animations selector it is anchored to.
+    /// The toggle follows the entire animation group it is anchored to.
     #[test]
     fn video_options_show_discord_toggle_after_animations() {
         let Some(carrier) = ui_engine::test_support::carrier() else {
@@ -60,7 +62,7 @@ mod tests {
         let position = |name: &str| section.children.iter().position(|child| child.name == name);
         assert_eq!(
             position(DISCORD_PRESENCE_OPTION.name),
-            position(ANIMATIONS_OPTION.name).map(|at| at + 1)
+            position(SettingPanel::VideoJavaCombat.options().last().unwrap().name).map(|at| at + 1)
         );
     }
 }

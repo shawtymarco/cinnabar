@@ -47,6 +47,29 @@ pub(crate) struct InteractionRuntime {
 }
 
 impl InteractionRuntime {
+    /// Preserves an accepted action when ordered input takes over an unordered frame.
+    fn with_existing_build_action(world: &World) -> Self {
+        let mut runtime = Self::default();
+        let action = if world
+            .get_resource::<client_interaction::survival_mining::SurvivalMiningRuntime>()
+            .is_some_and(|mining| mining.destroying_target().is_some())
+        {
+            Some(Action::Attack)
+        } else if world
+            .resource::<BlockUseRuntime>()
+            .last_success_destination()
+            .is_some()
+        {
+            Some(Action::Use)
+        } else {
+            None
+        };
+        if let Some(action) = action {
+            runtime.frames.observe_build_button(action, true);
+        }
+        runtime
+    }
+
     /// Whether the next drain will invalidate world-owned work for this scope.
     pub(crate) fn changes_world(
         &self,
@@ -158,13 +181,27 @@ pub(crate) fn held(
     input: &SemanticInputSnapshot,
     action: Action,
 ) -> bool {
-    !is_blocked(runtime)
+    if is_blocked(runtime) {
+        return false;
+    }
+    let ordered = runtime.zip(input.snapshot().and_then(|input| input.ordered.as_ref()));
+    ordered.map_or_else(
+        || input.phase(action).held,
+        |(runtime, ordered)| ordered.buttons_at(runtime.ingested).held(action),
+    )
+}
+
+/// Reads held mining or placement from the latest hand-action intention.
+/// Item charging continues to read its own use-button state through `held`.
+pub(crate) fn build_held(
+    runtime: Option<&InteractionRuntime>,
+    input: &SemanticInputSnapshot,
+    action: Action,
+) -> bool {
+    held(runtime, input, action)
         && runtime
             .zip(input.snapshot().and_then(|input| input.ordered.as_ref()))
-            .map_or_else(
-                || input.phase(action).held,
-                |(runtime, ordered)| ordered.buttons_at(runtime.ingested).held(action),
-            )
+            .is_none_or(|(runtime, _)| runtime.frames.build_action_active(action))
 }
 
 /// Reads unconsumed action events in their original order, unless the batch is quarantined.
@@ -247,7 +284,7 @@ pub(crate) fn drain(world: &mut World, phase: DispatchPhase, windows: &mut Prima
     let ordered = snapshot.ordered.as_ref().expect("ordered snapshot");
     let mut runtime = world
         .remove_resource::<InteractionRuntime>()
-        .unwrap_or_default();
+        .unwrap_or_else(|| InteractionRuntime::with_existing_build_action(world));
     let authority = world
         .resource::<MovementTicker>()
         .interaction_authority_identity();
@@ -359,6 +396,9 @@ pub(crate) fn drain(world: &mut World, phase: DispatchPhase, windows: &mut Prima
                 break;
             }
             let context = context.get_or_insert_with(|| capture(world, &snapshot, phase));
+            runtime
+                .frames
+                .observe_build_button(edge.action, edge.pressed);
             dispatch(
                 world,
                 InteractionInput {
@@ -375,6 +415,13 @@ pub(crate) fn drain(world: &mut World, phase: DispatchPhase, windows: &mut Prima
         || runtime.frames.quarantined()
     {
         // A blocked suffix expires only at its final opportunity, without replay next frame.
+        if active && !snapshot.authority_released && !runtime.frames.quarantined() {
+            for edge in ordered.events().iter().skip(runtime.ingested) {
+                runtime
+                    .frames
+                    .observe_build_button(edge.action, edge.pressed);
+            }
+        }
         runtime.ingested = ordered.events().len();
         world
             .resource_mut::<ItemUseRuntime>()
