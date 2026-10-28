@@ -125,6 +125,8 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
   outlines and third-person held-item qualification remain incomplete.
   Chests retain pack face materials for destruction and mining particles;
   matched chest-particle presentation and custom destruction overrides remain incomplete.
+  Mining particles accept packed and face-specific block events, preserving full hashed
+  identities and the event's block material; matched in-world capture acceptance remains open.
 - [ ] Close straw-bed native-gallery and replacement-pack acceptance. Both halves
   use pack geometry in all four directions; sleeping and picking remain unqualified.
   Beacon base/core/shell compilation remains provisional: the base's 0.1-pixel
@@ -886,9 +888,10 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   Recipe-book placement, availability and auto-crafting share exact ingredient allocation;
   each ingredient draws from one concrete variant. Missing grid ingredients and their
   result use distinct ghost cells in both renderers and retain hover names.
-  Plain shield recipe results retain their blocking timestamp in recipe admission,
-  predicted stacks and result declarations. Patterned shield rendering, banner application,
-  matched input/packet timing and broader crafting and container acceptance remain incomplete.
+  Shield recipe results retain their blocking timestamp in recipe admission, predicted stacks
+  and result declarations. Advertised banner application recipes match current workbench inputs
+  and preserve their output data. Patterned rendering, matched input/packet timing and broader
+  crafting and container acceptance remain incomplete.
   Hover reports and actor use share the attack's game-mode actor cap.
   Actor rays use loaded collision defaults, authoritative dimensions and scale, and
   constructor pick radii. Attack, use and hover preserve the selected world intercept.
