@@ -52,6 +52,8 @@ mod grindstone;
 mod heavy_core;
 #[path = "tests/hollow_containers.rs"]
 mod hollow_containers;
+#[path = "tests/hopper.rs"]
+mod hopper;
 #[path = "tests/isotropic.rs"]
 mod isotropic;
 #[path = "tests/lantern.rs"]

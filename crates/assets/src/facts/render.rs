@@ -13,6 +13,7 @@ pub enum BlockRenderKind {
     HangingSign,
     Lantern,
     FlowerPot,
+    Hopper,
     BambooFence,
     BambooGate,
     NetherBrickFence,
@@ -219,6 +220,7 @@ impl BlockRenderKind {
             | R::SeaPickle
             | R::BrewingStand
             | R::Campfire
+            | R::Hopper
             | R::Grindstone
             | R::Stonecutter
             | R::TripwireHook

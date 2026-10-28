@@ -81,6 +81,8 @@ pub enum Fixture {
         raised: bool,
     },
     Loading(ui::LoadingStage),
+    /// The client-owned cover shown while a resource-pack snapshot is published.
+    ResourcePackLoading,
     Chat {
         draft: &'static str,
         suggestions: Vec<Arc<str>>,
@@ -498,6 +500,18 @@ const STATES: &[State] = &[
         size: SIZE,
         gui_scale: GUI_SCALE,
         fixture: || Fixture::Loading(ui::LoadingStage::BuildingTerrain),
+    },
+    State {
+        name: "resource-pack-loading",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: || Fixture::ResourcePackLoading,
+    },
+    State {
+        name: "resource-pack-loading-small",
+        size: [640, 360],
+        gui_scale: GUI_SCALE,
+        fixture: || Fixture::ResourcePackLoading,
     },
     State {
         name: "disconnect",

@@ -136,6 +136,8 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
 
 - [ ] Qualify static/non-cube models, blend/water and flipbooks, including native
   presentation and animation. Identify unsupported states before adding implementation.
+  Hopper states compile a textured hollow bowl and directional outlet as a provisional fallback;
+  matched dimensions, lighting and replacement-pack acceptance remain incomplete.
   Held end-rod models and narrow rod selection bounds are implemented; matched final-frame
   outlines and third-person held-item qualification remain incomplete.
   Chests retain pack face materials for destruction and mining particles;
@@ -514,8 +516,10 @@ recovery policy: vanilla runs no separate push-out after a teleport, and its clo
 push instead nudges horizontal velocity toward free space by at most 0.1 block per tick
 for actors with the push-towards-closest-space flag, which is not modelled.
 
-Camera aim-policy reports distinguish both third-person views and retry changes that
-have not entered the outbound queue. Complete camera activation acceptance remains open.
+Camera aim-policy reports are sent only for cameras configured by server presets,
+distinguish both third-person views and retry changes that have not entered the outbound
+queue. Which camera wins when an inherited first-person preset competes with the base
+camera is unverified. Complete camera activation acceptance remains open.
 
 See [gameplay/session ownership](docs/architecture/gameplay-session.md),
 [effective movement speed](docs/reference/effective-movement-speed.md) and

@@ -3215,6 +3215,14 @@
       ]
     },
     {
+      "id": "render-hopper",
+      "fact": "render:Hopper",
+      "status": "provisional",
+      "members": [
+        "minecraft:hopper"
+      ]
+    },
+    {
       "id": "render-bubble-column",
       "fact": "render:BubbleColumn",
       "status": "provisional",
@@ -6546,7 +6554,7 @@
         "route": "no_draw",
         "renderer": "none",
         "diagnostic": "deferred",
-        "geometry": "diagnostic"
+        "geometry": "model_or_diagnostic"
       },
       "members": [
         "minecraft:hopper"

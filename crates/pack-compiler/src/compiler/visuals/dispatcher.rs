@@ -162,6 +162,7 @@ struct VisualCompiler {
     bubble_column_templates: BTreeMap<[u32; 9], u32>,
     candle_cake_templates: BTreeMap<[u32; 4], u32>,
     hollow_container_templates: BTreeMap<(super::hollow_containers::VesselState, Vec<u32>), u32>,
+    hopper_templates: BTreeMap<([u32; 6], u8), u32>,
 }
 
 impl VisualCompiler {
@@ -498,6 +499,15 @@ impl VisualCompiler {
             record,
             inputs,
             &mut self.hollow_container_templates,
+            &mut ModelStorage {
+                templates: &mut self.model_templates,
+                quads: &mut self.model_quads,
+            },
+        ));
+        ordered_rule!(super::hopper::compile_rule(
+            record,
+            inputs,
+            &mut self.hopper_templates,
             &mut ModelStorage {
                 templates: &mut self.model_templates,
                 quads: &mut self.model_quads,

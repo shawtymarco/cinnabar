@@ -4,7 +4,7 @@
 (protocol 2225), copied byte for byte with no local patches. Only `protocol` depends on it.
 
 - Generator: https://github.com/cinnabar-mc/protocolgen
-- Generator commit: `2aaf70061542d2d0c7cce25653ba494a2a320842` (`generated/1.26.60/rust-contract`)
+- Generator commit: `2265acd53847733ab10127646e76d575999c18d5` (`generated/1.26.60/rust-contract`)
 
 The expected protocol, codec contract and manifest fingerprint are pinned once, in
 `assets/bedrock-target.json`; a protocol test fails until a re-vendored crate matches them. The client reports the target game version to match gophertunnel.
