@@ -254,12 +254,10 @@ fn host_environment() -> Environment {
     }
 }
 
-/// Uses exact integer dot steps on DX12 and CPU adapters unless the device's `fma` is measured
-/// to round once: the steps multiply compile time, and native `fma` keeps the device's subnormals.
+/// Uses exact dot steps on DX12 and CPU adapters without requiring optional float64 support.
 fn software_fused_dot(gpu: &GpuContext) -> bool {
     let info = gpu.adapter.get_info();
-    (info.backend == wgpu::Backend::Dx12 || info.device_type == wgpu::DeviceType::Cpu)
-        && !super::fused_fma::rounds_once(gpu)
+    info.backend == wgpu::Backend::Dx12 || info.device_type == wgpu::DeviceType::Cpu
 }
 
 /// Stops retired workers before opening files or submitting another GPU construction batch.
@@ -293,23 +291,17 @@ pub(crate) fn load(
     super::kernels::validate_device(&gpu.device.limits())?;
     check_cancelled(progress)?;
     let started = std::time::Instant::now();
-    progress.begin("measuring the device's fma");
-    let software_fused_dot = software_fused_dot(gpu);
-    bevy::log::info!(target: "cinnabar::shaderpack", software_fused_dot, "dot accumulation chosen");
-    progress.begin("translating the pack");
     let request = shaderpack::worker::Request {
         pack: path.to_owned(),
         options: options.map(Path::to_owned),
         dimension: dimension.to_owned(),
         environment: host_environment(),
-        software_fused_dot,
+        software_fused_dot: software_fused_dot(gpu),
         purpose: shaderpack::worker::Purpose::Render,
     };
-    // The compiler's time limit covers only its own work, not the probe before it.
-    let compiling = std::time::Instant::now();
     let mut worker = shaderpack::worker::Running::start(compiler, &request)?;
     let compiled = loop {
-        if let Some(result) = worker.poll(compiling.elapsed(), progress.is_cancelled()) {
+        if let Some(result) = worker.poll(started.elapsed(), progress.is_cancelled()) {
             break result?.into_translation()?;
         }
         std::thread::park_timeout(std::time::Duration::from_millis(10));
@@ -560,18 +552,11 @@ fn build_translation(
         let mut programs = Vec::with_capacity(all.len());
         // Per geometry program: its pipeline layout, vertex module and fragment stage.
         let mut geometry_stages = vec![];
-        // Programs, geometry draws, then host pipelines: each driver compile records a step,
-        // and a cancelled load stops before starting another.
+        // Programs, geometry draws, then the host pipelines: the loading toast counts each.
         let steps = all.len() + selected_draws.len() + 1;
-        let mut built = 0;
-        let mut step = |label: &str| {
+        for (built, (program, reflection)) in all.iter().zip(&reflections).enumerate() {
             check_cancelled(progress)?;
-            progress.record_built(built, steps, label);
-            built += 1;
-            Ok(())
-        };
-        for (program, reflection) in all.iter().zip(&reflections) {
-            step(&format!("building {}", program.program.name))?;
+            progress.record_built(built, steps);
             let bindings = resolve_bindings(
                 &mut constants,
                 program.program.group,
@@ -782,8 +767,8 @@ fn build_translation(
             });
         }
         let shadow_slots = constants.shadow_slots();
-        check_cancelled(progress)?;
         let mut geometry_failures = vec![];
+        progress.record_built(all.len(), steps);
         let draws = geometry_draws(
             gpu,
             pipeline_cache.as_ref().map(|c| &c.cache),
@@ -794,8 +779,8 @@ fn build_translation(
             &effects,
             &buffer_formats,
             &shadow_slots,
+            progress,
             &mut geometry_failures,
-            &mut step,
         )?;
         // `shadowtex0` can be the attachment itself unless a shadow program samples it while
         // the pass draws.
@@ -845,7 +830,7 @@ fn build_translation(
                 .map(|program| (program.group, program.fullscreen_uniforms())),
             &custom_uniforms,
         );
-        step("building the host pipelines")?;
+        progress.record_built(all.len() + selected_draws.len(), steps);
         let host = host_pipelines(
             &gpu.device,
             &buffer_formats,

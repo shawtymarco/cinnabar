@@ -119,14 +119,11 @@ impl ShaderPackLoadProgress {
     }
 }
 
-/// How far a load worker has come, and what it is doing, written as it works.
+/// How far a load worker has come, written as it works.
 #[derive(Debug, Default)]
 pub struct LoadProgress {
     programs: AtomicU64,
     pipelines: AtomicU64,
-    /// Bumped by every record, so the host can tell a slow load from one that stopped.
-    steps: AtomicU64,
-    step: std::sync::Mutex<String>,
     cancelled: AtomicBool,
 }
 
@@ -147,33 +144,17 @@ impl LoadProgress {
     pub fn record(&self, translated: usize, programs: usize) {
         self.programs
             .store(pack_counts(translated, programs), Ordering::Relaxed);
-        self.steps.fetch_add(1, Ordering::Relaxed);
     }
 
-    /// Records that the worker starts `step`, such as `building composite`, after finishing
-    /// `built` of `pipelines` GPU build steps.
-    pub fn record_built(&self, built: usize, pipelines: usize, step: &str) {
+    /// Records `built` of `pipelines` GPU build steps done.
+    pub fn record_built(&self, built: usize, pipelines: usize) {
         self.pipelines
             .store(pack_counts(built, pipelines), Ordering::Relaxed);
-        self.begin(step);
     }
 
-    /// Records that the worker starts `step`; a stall report names the last one begun.
-    pub fn begin(&self, step: &str) {
-        step.clone_into(&mut self.step.lock().unwrap_or_else(|e| e.into_inner()));
-        self.steps.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// How many records the worker has made; unchanged while it is stuck in one step.
-    #[must_use]
-    pub fn steps(&self) -> u64 {
-        self.steps.load(Ordering::Relaxed)
-    }
-
-    /// The step last begun, empty before the first.
-    #[must_use]
-    pub fn step(&self) -> String {
-        self.step.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    /// Counts one more build step done, from any of the threads building the pack's pipelines.
+    pub fn add_built(&self) {
+        self.pipelines.fetch_add(1 << 32, Ordering::Relaxed);
     }
 
     /// Whether the host has completed or replaced this load and the worker should stop.
@@ -517,17 +498,18 @@ mod tests {
     }
 
     #[test]
-    fn every_record_counts_as_progress_and_names_its_step() {
+    fn built_pipelines_count_from_every_building_thread() {
         let mut progress = ShaderPackLoadProgress::default();
         let load = progress.start();
-        assert_eq!((load.steps(), load.step()), (0, String::new()));
         load.record(3, 9);
-        load.record_built(0, 4, "building composite");
-        assert_eq!(progress.pipelines(), Some((0, 4)));
-        load.record_built(1, 4, "building final");
-        assert_eq!(load.steps(), 3);
-        assert_eq!(load.step(), "building final");
+        load.record_built(1, 40);
+        assert_eq!(progress.pipelines(), Some((1, 40)));
+        std::thread::scope(|scope| {
+            for _ in 0..4 {
+                scope.spawn(|| (0..8).for_each(|_| load.add_built()));
+            }
+        });
+        assert_eq!(progress.pipelines(), Some((33, 40)));
         assert_eq!(progress.programs(), Some((3, 9)));
-        assert_eq!(progress.pipelines(), Some((1, 4)));
     }
 }

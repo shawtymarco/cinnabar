@@ -38,7 +38,9 @@ evidence; the [workspace map](docs/architecture/workspace.md) explains code owne
    VSync-off cadence still needs hardware qualification.
    Displayed cadence, input latency and surface-reconfiguration
    stalls still need hardware qualification; this closes no acceptance gate.
-   Startup reports the first presented menu frame and its CPU stages. Menu launches
+   Startup reports the first presented menu frame, its CPU stages, critical-path milestones
+   that partition the launch, per-pipeline readiness and texture uploads by call site;
+   `devtool startup` covers warm and cold driver caches and carriers. Menu launches
    defer world carriers, collision binding and static GUI item geometry until the
    first completed menu frame; joins wait for the prepared bundle. World pipeline
    warmup also waits for that boundary, and terrain compute owners prepare on workers.
@@ -1610,13 +1612,12 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   Pipelines the device rejects, including backend compiler failures such as FXC limits on
   DX12, fail the pack load (or drop that geometry draw) instead of stopping the client.
   DX12 and software adapters use integer-backed fused dot accumulation to preserve the
-  reference hash rounding unless a load-time probe shows the device's own `fma` rounds once;
-  other hardware backends retain native fused instructions. The integer steps multiply
-  pipeline compile time for dot-heavy packs, so devices the probe rejects load slowly.
-  Hardware DX12 pack acceptance, including the probe's verdict on each vendor, remains incomplete.
-  The loading toast counts built pipelines. A load that records no progress for three minutes
-  fails with the step it stopped in, and its worker no longer holds up the next selection.
-  Retired loads cancel between GPU batches; rapid selections share one load worker. Atlas
+  reference hash rounding; other hardware backends retain native fused instructions. Those
+  helpers loop over components and select instead of branching, so DXC compiles a large pack
+  in seconds rather than minutes. Hardware DX12 pack acceptance remains incomplete.
+  Geometry draw pipelines build on worker threads (half the hardware threads), and the loading
+  toast counts built pipelines. Retired loads cancel between GPU batches and between pipelines;
+  a superseded load is left to stop on its own, so the next selection starts at once. Atlas
   builds cancel between source, pixel and upload stages, and one cancelled build retires before its
   replacement starts. Trusted helper shaders and their pipeline cache are created only when requested,
   then released after Off. Lifecycle conditions skip shader-pack system bodies in the main,

@@ -66,46 +66,9 @@ fn software_fused_dot_matches_binary32_mul_add() {
         eprintln!("missing fixture: native GPU adapter for software fused dot");
         return;
     };
-    for [a, b, c, got] in dot_results(&gpu, true) {
-        let [a, b, c, got] = [a, b, c, got].map(f32::from_bits);
-        let expected = a.mul_add(b, c);
-        assert!(
-            (expected.is_nan() && got.is_nan()) || expected.to_bits() == got.to_bits(),
-            "{a:?} * {b:?} + {c:?}: {got:?} versus {expected:?}"
-        );
-    }
-}
-
-/// A device whose `fma` the load's probe finds rounding once gives the reference rounding
-/// through the native helpers for every normal operand and result.
-#[test]
-fn native_dot_matches_binary32_mul_add_where_the_probe_finds_single_rounding() {
-    let Some(gpu) = gpu() else {
-        eprintln!("missing fixture: native GPU adapter for native fused dot");
-        return;
-    };
-    if !super::super::fused_fma::rounds_once(&gpu) {
-        eprintln!("missing fixture: an adapter whose fma rounds once");
-        return;
-    }
-    for [a, b, c, got] in dot_results(&gpu, false) {
-        let [a, b, c, got] = [a, b, c, got].map(f32::from_bits);
-        let expected = a.mul_add(b, c);
-        if [a, b, c, a * b, expected].iter().all(|v| v.is_normal()) {
-            assert_eq!(
-                expected.to_bits(),
-                got.to_bits(),
-                "{a:?} * {b:?} + {c:?}: {got:?} versus {expected:?}"
-            );
-        }
-    }
-}
-
-/// Runs [`COMPUTE`]'s translated dot over [`samples`] and returns each sample with its result.
-fn dot_results(gpu: &GpuContext, software_fused_dot: bool) -> Vec<[u32; 4]> {
     let pack = pack(&[("composite.csh", COMPUTE)]);
     let translation = pack.translate(&shaderpack::TranslateConfig {
-        software_fused_dot,
+        software_fused_dot: true,
         ..Default::default()
     });
     let program = &translation.programs[0];
@@ -180,5 +143,15 @@ fn dot_results(gpu: &GpuContext, software_fused_dot: bool) -> Vec<[u32; 4]> {
         .unwrap();
     rx.recv().unwrap().unwrap();
     let bytes = readback.slice(..).get_mapped_range().unwrap();
-    bytemuck::cast_slice::<u8, [u32; 4]>(&bytes).to_vec()
+    for (index, result) in bytemuck::cast_slice::<u8, [u32; 4]>(&bytes)
+        .iter()
+        .enumerate()
+    {
+        let [a, b, c, got] = result.map(f32::from_bits);
+        let expected = a.mul_add(b, c);
+        assert!(
+            (expected.is_nan() && got.is_nan()) || expected.to_bits() == got.to_bits(),
+            "sample {index} {result:x?}: {a:?} * {b:?} + {c:?}: {got:?} versus {expected:?}"
+        );
+    }
 }

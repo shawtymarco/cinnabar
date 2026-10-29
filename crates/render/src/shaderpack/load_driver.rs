@@ -1,5 +1,5 @@
-//! The main-world load lifecycle: starting a worker for each request, retiring superseded
-//! ones and publishing results, including a worker that stops making progress.
+//! The main-world load lifecycle: starting a worker for each request, cancelling superseded
+//! ones and publishing results.
 
 use super::loader::{PackGpu, load};
 use super::pipelines::GpuContext;
@@ -10,19 +10,13 @@ use bevy::{
     render::renderer::{RenderAdapter, RenderDevice, RenderQueue},
 };
 use render_scene::shaderpack::{
-    LoadProgress, ShaderPackFrameInputs, ShaderPackLoadProgress, ShaderPackRequest,
-    ShaderPackSettledRevision, ShaderPackStatus,
+    ShaderPackFrameInputs, ShaderPackLoadProgress, ShaderPackRequest, ShaderPackSettledRevision,
+    ShaderPackStatus,
 };
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex, mpsc},
-    time::Duration,
 };
-
-/// How long a load may go without recording progress before it fails and Vanilla draws; above
-/// the compiler's own limit, so only a step that never returns, such as a driver compile, trips it.
-pub(super) const STALL_LIMIT: Duration = Duration::from_secs(180);
-const _: () = assert!(STALL_LIMIT.as_secs() > shaderpack::worker::TIME_LIMIT.as_secs());
 
 type LoadResult = Result<PackGpu, String>;
 
@@ -33,60 +27,7 @@ type LoaderKey = (PathBuf, Option<PathBuf>, i32, u64);
 #[derive(Resource, Default)]
 pub(super) struct Loader {
     pub(super) key: Option<LoaderKey>,
-    pub(super) job: Option<Job>,
-    pub(super) retiring: bool,
-}
-
-/// One load worker's result channel and the progress it records.
-pub(super) struct Job {
-    result: Mutex<mpsc::Receiver<LoadResult>>,
-    progress: Arc<LoadProgress>,
-    /// The worker's step count and when it was first seen.
-    seen: Option<(u64, Duration)>,
-}
-
-impl Job {
-    /// Watches `result` from the worker that records into `progress`.
-    pub(super) fn new(result: mpsc::Receiver<LoadResult>, progress: Arc<LoadProgress>) -> Self {
-        Self {
-            result: Mutex::new(result),
-            progress,
-            seen: None,
-        }
-    }
-
-    /// The worker's outcome at `now`, or an error once it has recorded no progress for
-    /// [`STALL_LIMIT`]; a stalled worker is left to finish on its own, cancelled.
-    fn poll(&mut self, now: Duration) -> Option<LoadResult> {
-        match self
-            .result
-            .get_mut()
-            .unwrap_or_else(|e| e.into_inner())
-            .try_recv()
-        {
-            Ok(outcome) => return Some(outcome),
-            Err(mpsc::TryRecvError::Disconnected) => {
-                return Some(Err("the load worker stopped".to_owned()));
-            }
-            Err(mpsc::TryRecvError::Empty) => {}
-        }
-        let steps = self.progress.steps();
-        let since = match self.seen {
-            Some((seen, since)) if seen == steps => since,
-            _ => {
-                self.seen = Some((steps, now));
-                return None;
-            }
-        };
-        (now.saturating_sub(since) >= STALL_LIMIT).then(|| {
-            let step = self.progress.step();
-            Err(format!(
-                "stopped responding while {}: no progress for {} s",
-                if step.is_empty() { "loading" } else { &step },
-                STALL_LIMIT.as_secs()
-            ))
-        })
-    }
+    pub(super) job: Option<Mutex<mpsc::Receiver<LoadResult>>>,
 }
 
 /// Identifies the request whose load can be reused in the current dimension.
@@ -128,13 +69,14 @@ pub(super) fn drive_loader(
     gpu: MainWorldGpu,
     atmosphere: Option<Res<render_scene::AtmosphereTextureAssets>>,
     compiler: Option<Res<render_scene::shaderpack::ShaderPackCompilerExecutable>>,
-    time: Res<Time<Real>>,
 ) {
-    let now = time.elapsed();
     let wanted = loader_key(&request, inputs.dimension);
-    if loader.job.is_some() && (wanted != loader.key || loader.retiring) {
+    if loader.job.is_some() && wanted != loader.key {
+        // The superseded worker is cancelled and left to stop on its own, so a long driver
+        // compile in it never holds up the next selection.
         progress.finish();
-        loader.retiring = true;
+        loader.job = None;
+        loader.key = None;
         let keep_shown = wanted.as_ref().is_some_and(
             |(path, ..)| matches!(&*status, ShaderPackStatus::Ready(shown) if shown == path),
         );
@@ -148,20 +90,6 @@ pub(super) fn drive_loader(
                     }),
             );
         }
-        // Keep the receiver until the old worker exits. Rapid selections coalesce into the
-        // latest request rather than accumulating detached CPU and GPU load workers; only a
-        // stalled worker is left behind.
-        match loader.job.as_mut().and_then(|job| job.poll(now)) {
-            None => return,
-            Some(Err(reason)) => debug!(
-                target: "cinnabar::shaderpack",
-                "superseded shader pack load ended: {reason}"
-            ),
-            Some(Ok(_)) => {}
-        }
-        loader.job = None;
-        loader.key = None;
-        loader.retiring = false;
     }
     if wanted != loader.key {
         let Some((path, _, dimension, _)) = wanted.clone() else {
@@ -203,7 +131,6 @@ pub(super) fn drive_loader(
             .unwrap_or_default();
         let (send, receive) = mpsc::channel();
         let worker_progress = progress.start();
-        let watched = Arc::clone(&worker_progress);
         let spawned = std::thread::Builder::new()
             .name("shader pack load".into())
             .spawn(move || {
@@ -221,7 +148,7 @@ pub(super) fn drive_loader(
                 let _ = send.send(outcome);
             });
         match spawned {
-            Ok(_) => loader.job = Some(Job::new(receive, watched)),
+            Ok(_) => loader.job = Some(Mutex::new(receive)),
             Err(error) => {
                 progress.finish();
                 if let Some((path, _, _, revision)) = &loader.key {
@@ -235,8 +162,13 @@ pub(super) fn drive_loader(
         }
         return;
     }
-    let Some(outcome) = loader.job.as_mut().and_then(|job| job.poll(now)) else {
+    let Some(job) = loader.job.as_mut() else {
         return;
+    };
+    let outcome = match job.get_mut().unwrap_or_else(|e| e.into_inner()).try_recv() {
+        Ok(outcome) => outcome,
+        Err(mpsc::TryRecvError::Empty) => return,
+        Err(mpsc::TryRecvError::Disconnected) => Err("the load worker stopped".to_owned()),
     };
     loader.job = None;
     progress.finish();

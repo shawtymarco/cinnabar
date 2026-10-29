@@ -688,7 +688,6 @@ pub(super) fn build(app: &mut App) {
         .init_resource::<ShaderPackActorIds>()
         .init_resource::<LoadedShaderPack>()
         .init_resource::<Loader>()
-        .init_resource::<Time<Real>>()
         .init_resource::<ViewFailures>()
         .add_plugins((
             SyncComponentPlugin::<ShaderPackRendering>::default(),

@@ -35,7 +35,6 @@ mod draw_pipelines;
 mod draws;
 pub(crate) mod effects;
 mod frame_geometry;
-mod fused_fma;
 pub(crate) mod geometry;
 mod geometry_shader;
 #[cfg(test)]
@@ -51,6 +50,7 @@ mod native_passes;
 mod overlay_depth;
 mod passes;
 mod pipeline_cache;
+mod pipeline_workers;
 mod pipelines;
 mod plan;
 pub(crate) mod plugin;

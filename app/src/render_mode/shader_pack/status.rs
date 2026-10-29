@@ -149,7 +149,7 @@ mod tests {
                 pipelines: None,
             }
         );
-        worker.record_built(2, 5, "building composite");
+        worker.record_built(2, 5);
         assert_eq!(
             pack_load(&config, &status, Some(&progress), None),
             PackLoad::Loading {
