@@ -10,6 +10,7 @@ mod control_locked;
 mod cosmetic_particles;
 #[cfg(feature = "test-support")]
 mod crafting;
+mod crosshair_coverage;
 #[cfg(feature = "test-support")]
 mod data_driven;
 mod edit_selection;
@@ -84,12 +85,17 @@ impl RemoteSource for Offline {
 /// Paints a named state at fixed times and encodes deterministic RGBA PNG bytes.
 #[cfg(test)]
 pub fn png(state: &State, dir: &Path) -> Result<Vec<u8>, Error> {
-    png_at(state, dir, CAPTURE_SECONDS)
+    png_at(state, dir, CAPTURE_SECONDS, None)
 }
 
 /// Samples caller-owned UI and cosmetic animation time without reading the clock.
-pub fn png_at(state: &State, dir: &Path, seconds: f64) -> Result<Vec<u8>, Error> {
-    png_fixture(state, (state.fixture)(), dir, seconds, None)
+pub fn png_at(
+    state: &State,
+    dir: &Path,
+    seconds: f64,
+    resource_pack: Option<&Path>,
+) -> Result<Vec<u8>, Error> {
+    png_fixture(state, (state.fixture)(), dir, seconds, resource_pack)
 }
 
 /// Renders an authored panel at an explicit animation sample without creating a window.
@@ -125,6 +131,9 @@ fn png_fixture(
     seconds: f64,
     resource_pack: Option<&Path>,
 ) -> Result<Vec<u8>, Error> {
+    if let Fixture::CrosshairCoverage { fixed } = &fixture {
+        return crosshair_coverage::png(state.size, *fixed, resource_pack);
+    }
     if let Fixture::MaskRegression = &fixture {
         return saturation_overlap::regression_png(state.size);
     }
@@ -188,6 +197,7 @@ fn png_fixture(
         Fixture::Chat { .. }
         | Fixture::TabList(_)
         | Fixture::EditSelection
+        | Fixture::CrosshairCoverage { .. }
         | Fixture::MaskRegression
         | Fixture::SaturationOverlap { .. }
         | Fixture::SpriteOutline { .. }
@@ -248,6 +258,7 @@ fn png_fixture(
             backup_font::paint(&engine, &mut frame)?;
         }
         Fixture::SpriteOutline { .. }
+        | Fixture::CrosshairCoverage { .. }
         | Fixture::MaskRegression
         | Fixture::SaturationOverlap { .. }
         | Fixture::TiledImage { .. } => {
