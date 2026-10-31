@@ -177,10 +177,12 @@ Displayed-frame pacing and complete resize/platform acceptance remain incomplete
   carried items, edge UVs, replacement materials and different texture resolutions.
 - [ ] Close directional cube face mapping. Furnace-family cubes and the loom select pack
   faces (and the loom's top/bottom flips) from their facing, and the stonecutter turns its saw
-  plane and top art with its direction. Observers, crafters, dispensers, droppers and piston
-  bodies select each face's slot, UV turn and texture variant from their state. Piston bodies
-  remain full cubes: the native three-quarter body and its separately drawn head are
-  incomplete. Jigsaw and vault faces, carved pumpkins and native-server captures remain.
+  plane and top art with its direction. Pumpkins pick their face slot and variant from their
+  direction and class. Observers, crafters, dispensers, droppers, piston bodies, jigsaws and
+  vaults select each face's slot, UV turn and texture variant from their state; vaults also
+  draw their inward-facing cutout interior. Piston bodies remain full cubes: the native
+  three-quarter body and its separately drawn head are incomplete. Native-server captures
+  remain.
 - [ ] Close chiseled-bookshelf native-gallery acceptance with two consecutive exact
   GPU-completed model-stream witnesses.
 - [ ] Close resin-clump native-gallery acceptance with two consecutive exact
@@ -1366,7 +1368,10 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   overruns retain committed output and recover admitted code with committed preferences on
   the bounded loading lane; consecutive overruns quarantine the guest, and a successful frame
   resets the count. Other guest traps still quarantine immediately. Live overrun recovery
-  qualification remains incomplete. Unmeasured shared
+  qualification remains incomplete. Host-observed world entry admits one larger frame
+  callback per mod and session, with one extra slot shared across mods per update and
+  unused extra fuel discarded. Deterministic tests cover admission, lifecycle, replacement
+  and recovery; live frame-time and slow-device qualification remain incomplete. Unmeasured shared
   blur, element blur, route exits and current-world visual integration remain incomplete.
 - Granted mod input exposes raw physical holds, player bindings and finalized per-key
   gameplay admission. Both held lists retain the 64-key cap with deterministic truncation;
