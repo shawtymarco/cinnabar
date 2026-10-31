@@ -3640,6 +3640,12 @@
       "suffix": "candle_cake"
     },
     {
+      "id": "render-candle",
+      "fact": "render:Candle",
+      "status": "verified",
+      "suffix": "candle"
+    },
+    {
       "id": "render-shelf",
       "fact": "render:Shelf",
       "status": "provisional",
