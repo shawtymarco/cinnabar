@@ -88,7 +88,7 @@ Native acceptance of that renderer, retail resource-pack and full-client accepta
 remain incomplete. Frostbite presentation, freezing potion facts and ice-ball targeting and use
 behavior remain unresolved until their native dispositions are verified. Aux-state
 item routing retains the legacy owner catalog and needs current-version acceptance.
-Brittle ice, chorus plants, ice balls, ice crystals and icicles retain missing-item
+Brittle ice, ice balls, ice crystals and icicles retain missing-item
 presentation until their current pack routes are verified.
 Invalid saved-token contents recover through device sign-in, preserving the cache
 until authentication succeeds. Filesystem failures retain credential-free operation
@@ -956,9 +956,10 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   Browser preparation and hardware warmup and first-open qualification remain incomplete.
   Rounded JSON-UI chrome supports bounded analytic box shadows with cached geometry;
   full menu visual and hardware frame-work acceptance remains open.
-  Mods explicitly open their own panels; the latest opening owns input and closes other panels.
-  Legacy toggle metadata is accepted without host key handling. Packet reactors use
-  grant-gated panel and physical-input imports; hardware acceptance remains pending.
+  Mods use explicit open, close and toggle requests for their panels; the latest opening owns
+  input and closes other panels. Panel content rejects the removed shortcut metadata.
+  Packet reactors use grant-gated panel and physical-input imports; hardware acceptance
+  remains pending.
   Client-owned panel collections support bounded five-column card grids with
   item-scoped expressions, vector artwork and one-time guest requests to reveal filtered
   items without rebuilding the catalog; hardware frame-work acceptance remains open.
@@ -1227,6 +1228,13 @@ acceptance still covers authenticated
 server/Realm/friend-world joins, transfers, reconnect/disconnect, account switching,
 presence, invites and required-pack failures. Preserve transport/session identity
 and keep actual account details out of captures and reports published with PRs.
+Signed-in addressed NetherNet joins, and transfers from any signed-in target, gather ICE
+candidates through the account's Player Messaging relay config (STUN and TURN), as vanilla
+does; signed-out joins gather local candidates only. A refused relay request, or one past the
+10 s implementation bound, leaves the join on local candidates; that bound is unverified, since
+vanilla holds its config from sign-in. Confirmed gap: the relay config's TURN server answers
+allocations with 300 Try Alternate, which pion's TURN client does not follow, so Cinnabar gathers
+STUN but no relay candidates. NAT and relay-only join acceptance remain open.
 Leaving closes old ingress immediately and releases buffered session payloads off the
 menu frame. Uploaded panorama faces remain ready during gameplay while their CPU pixels
 are released. `CINNABAR_LEAVE` records menu GPU completion separately from background
@@ -1789,8 +1797,10 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   reference hash rounding; other hardware backends retain native fused instructions. Those
   helpers loop over components and select instead of branching, so DXC compiles a large pack
   in seconds rather than minutes. Windows CI's D3D12 adapter returned NaN for a dot step with an
-  infinite operand where binary32 gives infinity, which WGSL permits; other non-finite samples on
-  D3D12 are unchecked. Hardware DX12 pack acceptance remains incomplete.
+  infinite operand where binary32 gives infinity, and flushed a subnormal addend while keeping a
+  subnormal product; WGSL permits both. Other non-finite samples on D3D12 are unchecked, and
+  subnormal operands are only checked up to flushing. Hardware DX12 pack acceptance remains
+  incomplete.
   Geometry draw pipelines build on worker threads (half the hardware threads), and the loading
   toast counts built pipelines. Retired loads cancel between GPU batches and between pipelines;
   a superseded load is left to stop on its own, so the next selection starts at once. Atlas
