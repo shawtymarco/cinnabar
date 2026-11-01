@@ -161,7 +161,9 @@ acceptance remain incomplete; see the [backend contract](crates/render/src/frame
   Mining particles accept packed and face-specific block events, preserving full hashed
   identities and the event's block material; matched in-world capture acceptance remains open.
 - [ ] Close straw-bed native-gallery and replacement-pack acceptance. Both halves
-  use pack geometry in all four directions; sleeping and picking remain unqualified.
+  use pack geometry and face corners in all four directions at full sheet resolution,
+  with a quarter-block collision and selection box; sleeping and in-game breaking
+  cracks remain unqualified.
   Beacon base/core/shell compilation remains provisional: the base's 0.1-pixel
   bottom offset rounds to the model grid; matched world and replacement-pack
   captures, carried-item presentation and finer coordinate precision remain open.
@@ -865,7 +867,9 @@ Video customization can hide other players' catalog cosmetics, companions and ef
 while keeping the local player's cosmetics visible.
 
 Player name tags use Java's standing player height before pose offsets, independent of
-server collision-box changes. Other actors retain their published label height.
+server collision-box changes. Other actors retain their published label height. Actor
+scale resizes the box, with its minimum extent, and not the clearance above it. Labels
+keep Java's 0.5-block clearance; native uses 0.7.
 Name-tag budgets admit on-screen bounds before their caps, favor nearer labels and
 keep cosmetic labels complete. Ordinary on-screen anchors skip text measurement for
 visibility. Atlas text retains formatting and line slots, with guarded cell edges and
@@ -1275,6 +1279,25 @@ Pack JSON whose value tree could need more than 1 GiB is refused before parsing,
 small archive cannot inflate into an allocation abort; that memory bound is an unverified limit.
 Pack JSON preserves raw control characters inside strings, including multiline manifest
 descriptions, through the shared parser used by local import and installed-pack admission.
+Global pack import also accepts Java Edition resource packs: an archive or folder with
+`pack.mcmeta` and no Bedrock manifest is translated by `java-resource-pack` into an ordinary
+Bedrock pack, which then passes the usual import validation. This is a Cinnabar feature without
+a vanilla counterpart. Translation covers block and item textures for pre-1.13 layouts (1.7
+and 1.8 included) and flattened layouts, worn armour including 1.21.2+ equipment, pre-coloured
+potions, clock and compass atlases from frames or pre-1.9 strips, the legacy HUD atlases and
+1.20.2+ HUD sprites, and OptiFine overworld skies. Targets vanilla ships as TGA are written as TGA
+so vanilla's `.tga` cannot shadow them, and grass sides are composed into Bedrock's tint masks.
+Every vanilla 1.7.10 and 1.8.9 block and item texture with a Bedrock counterpart maps to it, and
+their HUD crops match pixel for pixel. Translation holds at most 1 GiB of decoded and derived
+pixels, an implementation bound rather than a vanilla limit. The
+Java-to-Bedrock name tables and potion tints were derived outside the repository by matching
+Java Edition client textures against bedrock-samples; a fixture-gated test checks every table
+target and the flipbook list against the pinned sample pack, but no pinned Java source checks the
+Java side. Incomplete: dye-masked TGA targets (leather armour and items, firework charges), whose alpha
+encoding has no Java equivalent, Java animation metadata, models, block states, fonts, sounds, languages,
+entity and GUI textures beyond armour and the HUD, and OptiFine features other than the
+overworld sky are ignored. Import from Java launcher folders and live rendering acceptance with
+real Java packs remain open.
 
 Cosmetics require live authenticated multi-account acceptance, catalog/motion envelope
 coverage, supported slot/ownership enforcement, player-preview acceptance and hardware
@@ -1328,6 +1351,12 @@ Native audio follows changes to the system default output on its owner thread, r
 active and queued sounds across output replacement and retrying unavailable devices.
 The sound-definition catalog matches the current sample-pack pin; compiler coverage
 checks a UI sound and guards the manifest associated with the sound-definition digest.
+JSON-UI and container controls play their declared press sounds; OreUI controls stay silent at the
+owner's request. OreUI click parity is unverified: the 26.30 client registers
+`OreUI::SoundCommandGroup` in `OreUI::setupCommands`, and the group in 26.30 and 1.26.50.26 exposes
+callables taking (string, float, float) and returning a u64, plus (u64, float) and (u64) -> bool.
+OreUI scripts can therefore play named sounds, but which controls do is decided in the script
+bundle, which is not available here and would settle it.
 Automated transport tests cover switching and recovery. The polling cadence is provisional;
 native switch timing and live Bluetooth/platform acceptance remain incomplete.
 World sounds use the native distance curves: inverse from one block by default, linear
