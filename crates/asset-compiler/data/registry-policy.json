@@ -1365,7 +1365,8 @@
         "minecraft:grindstone",
         "minecraft:cartography_table",
         "minecraft:smithing_table",
-        "minecraft:beacon"
+        "minecraft:beacon",
+        "minecraft:lectern"
       ]
     },
     {
@@ -3285,6 +3286,22 @@
       "status": "provisional",
       "members": [
         "minecraft:stonecutter_block"
+      ]
+    },
+    {
+      "id": "render-lectern",
+      "fact": "render:Lectern",
+      "status": "provisional",
+      "members": [
+        "minecraft:lectern"
+      ]
+    },
+    {
+      "id": "render-bell",
+      "fact": "render:Bell",
+      "status": "provisional",
+      "members": [
+        "minecraft:bell"
       ]
     },
     {
