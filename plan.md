@@ -1467,12 +1467,12 @@ Native audio follows changes to the system default output on its owner thread, r
 active and queued sounds across output replacement and retrying unavailable devices.
 The sound-definition catalog matches the current sample-pack pin; compiler coverage
 checks a UI sound and guards the manifest associated with the sound-definition digest.
-JSON-UI and container controls play their declared press sounds; OreUI controls stay silent at the
-owner's request. OreUI click parity is unverified: the 26.30 client registers
-`OreUI::SoundCommandGroup` in `OreUI::setupCommands`, and the group in 26.30 and 1.26.50.26 exposes
-callables taking (string, float, float) and returning a u64, plus (u64, float) and (u64) -> bool.
-OreUI scripts can therefore play named sounds, but which controls do is decided in the script
-bundle, which is not available here and would settle it.
+JSON-UI and container controls play their declared press sounds, and OreUI controls play the theme
+click with vanilla's press timing. Confirmed gaps in OreUI interface sound: the drawer open and close
+sounds, hardcore toggle sounds and the uneventful-navigation reject. A gamepad button aliased to a
+control and a held touch's release are unverified, so they may click differently from vanilla, and
+touch on a server list section sounds at once instead of after the resting delay. Audible capture of
+these clicks remains open.
 Automated transport tests cover switching and recovery. The polling cadence is provisional;
 native switch timing and live Bluetooth/platform acceptance remain incomplete.
 World sounds use the native distance curves: inverse from one block by default, linear
@@ -1507,7 +1507,7 @@ Bootstrap windows initialize only the platform-preferred graphics API by default
 Particle atlas updates scope dynamic tile staging as well as base allocation. A failed tile update drops its partial atlas, keeps the generation uncommitted and retries the base plus current patches after retirement. Repeated failures keep exponential backoff until both the base and tiles upload successfully. Low-memory desktop GPU acceptance remains incomplete.
 
 Menu launches validate required startup artwork before entering the event loop. Static interface preparation overlaps renderer setup. World CPU assets prepare after the first completed menu frame, while GPU owners and world pipelines prepare on workers during the idle menu. Vulkan persists its driver pipeline cache. Before joins are admitted, the retained local appearance and pending catalog results adopt the validated default skin when no player or catalog image was selected. Native launch latency and the first ten frames' hitch budgets still need hardware acceptance.
-Desktop startup feedback starts without waiting for its loading window and uses the menus' stepped GUI scale and saved offset. Android has an asset-independent starting theme and activity overlay. Feedback retires after a completed destination-interface frame. Desktop and Android-emulator recordings confirm feedback and handoff to the first menu with prepared assets. The game activity's UI thread waits on the game thread until its event loop starts, and Android reports the app as not responding after 5 s; the setup activity therefore loads the startup carriers before starting the game activity. Interface and renderer preparation and the first frame still run inside that wait, so moving them out of it, low-end-phone acceptance and broader device acceptance remain pending.
+Desktop startup feedback starts without waiting for its loading window and uses the menus' stepped GUI scale and saved offset. Android has an asset-independent starting theme and activity overlay. Android first-run consent, download and preparation progress and failure retry draw on that startup screen; an emulator fixture with scripted setup reports confirms the flow, and a clean-install run with real downloads on a phone remains pending. Feedback retires after a completed destination-interface frame. Desktop and Android-emulator recordings confirm feedback and handoff to the first menu with prepared assets. The game activity's UI thread waits on the game thread until its event loop starts, and Android reports the app as not responding after 5 s; the setup activity therefore loads the startup carriers before starting the game activity. Interface and renderer preparation and the first frame still run inside that wait, so moving them out of it, low-end-phone acceptance and broader device acceptance remain pending.
 
 The setup and crash windows use Apple's Game Controller framework on macOS for controller
 buttons and hotplugging, including controllers unavailable through HID compatibility.
