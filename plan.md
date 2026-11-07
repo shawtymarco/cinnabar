@@ -813,7 +813,9 @@ and version-matched in-game acceptance remain incomplete.
   and matched inventory/held-item presentation. Egg and frogspawn inventory items use their
   carried sprites; remaining special shapes and animation still need matched comparisons.
   Crystal and spike items use their flat carried sprites.
-  Framed cube items retain their authored carried faces and three-dimensional geometry.
+  Framed cube items retain their authored carried faces and three-dimensional geometry at
+  native's quarter-block framed cube scale; native's shape-specific framed scales and turns
+  and data-driven block display transforms remain incomplete.
   Custom block stacks resolve through the `block_id` StartGame declares when the server's item
   registry omits the block's item; a later mid-session registry drops those derived items, and
   whether that matches native behavior is unverified. Cubes declared with the versioned full-block
@@ -1050,6 +1052,12 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   Tiled images retain full coverage with bounded repeat geometry across cropped
   regions and sliced borders; large collection admission and hardware frame-work
   acceptance remain incomplete.
+  Server UI textures larger than a 256-pixel page draw from full-resolution copies on the two
+  art pages. A full registry replaces textures no frame still draws. The textures a frame
+  draws pack ahead of launcher artwork; the pages repack for a new drawn set when a drawn
+  texture lacks a copy or the last packing left sources out. Vanilla loads each image as its own
+  texture, so a screen drawing more large images than the art pages and server pages hold
+  still leaves some blank; that bound is incomplete parity work.
 - [ ] `P5.2-HUD` — Close received text, titles, actionbar, toasts, survival/status HUD
   and lifecycle behavior without leaking UI-owned input into movement.
   Server language values decode newline and backslash escapes before text arguments
