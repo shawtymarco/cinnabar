@@ -167,7 +167,7 @@ pub(crate) fn advance_local_physics(
     if !movement_ticker.can_advance_physics_frame() {
         locals.observe_dismount(&frame, movement_ticker.session_generation());
         // Retain presses and publish the pose while transport pauses simulation.
-        publish_physics_view(&physics, &mut view);
+        publish_physics_view(&mut physics, &mut view);
         return;
     }
     let world = super::collision_world(
@@ -191,11 +191,16 @@ pub(crate) fn advance_local_physics(
             network.send_inventory_packets(vec![packet])
         });
     }
-    publish_physics_view(&physics, &mut view);
+    publish_physics_view(&mut physics, &mut view);
 }
 
 /// Publishes retained physics while the shared presentation source resolves visual overrides.
-fn publish_physics_view(physics: &LocalPhysicsController, view: &mut LocalViewPose) {
+fn publish_physics_view(physics: &mut LocalPhysicsController, view: &mut LocalViewPose) {
+    if let Some([yaw, pitch]) = physics.take_eased_rotation() {
+        view.set_rotation(crate::runtime::telemetry::bedrock_camera_rotation(
+            yaw, pitch,
+        ));
+    }
     if let (Some(eye), Some(feet)) = (
         physics.render_eye_position(),
         physics.render_feet_position(),
@@ -209,6 +214,86 @@ mod tests {
     use crate::modding::ModControlModes;
     use gameplay::movement::control_modes::{ControlModes, ControlObservation};
     use std::time::Duration;
+
+    /// An empty collision world isolates the completed-aim publication boundary.
+    struct Air;
+
+    impl sim::CollisionWorld for Air {
+        fn collision_boxes(
+            &self,
+            _: sim::Aabb,
+        ) -> Result<sim::CollisionQuery<Vec<sim::Aabb>>, sim::WorldQueryError> {
+            Ok(sim::CollisionQuery::synthetic(Vec::new()))
+        }
+    }
+
+    #[test]
+    fn physics_view_publishes_eased_aim_once_without_overwriting_later_mouse_input() {
+        let position = [0.5, 2.620_01, 0.5];
+        let mut physics = super::LocalPhysicsController::default();
+        physics.reanchor_network_position(position, 100, true);
+        assert!(physics.start_server_movement_lerp(position, true, &Air));
+        physics.set_server_movement_lerp_rotation([90.0, 30.0]);
+        let frame = physics.advance(
+            simulation_clock::TICK_DURATION,
+            sim::MovementInput::default(),
+            &Air,
+        );
+        assert!(frame.blocked.is_none(), "{:?}", frame.blocked);
+        let mut view = super::LocalViewPose::default();
+        super::publish_physics_view(&mut physics, &mut view);
+        assert!(view.rotation().abs_diff_eq(
+            crate::runtime::telemetry::bedrock_camera_rotation(30.0, 10.0),
+            0.0001
+        ));
+        let mouse_rotation = crate::runtime::telemetry::bedrock_camera_rotation(35.0, 12.0);
+        view.set_rotation(mouse_rotation);
+        super::publish_physics_view(&mut physics, &mut view);
+        assert_eq!(view.rotation(), mouse_rotation);
+    }
+
+    /// One forward walking frame under `settings` with no sprint key input.
+    fn walk(
+        controls: &mut ControlModes,
+        millis: u64,
+        settings: ui::GameplaySettings,
+    ) -> gameplay::movement::control_modes::ControlOutput {
+        controls.update(ControlObservation {
+            now: Duration::from_millis(millis),
+            forward: 1.0,
+            toggle_sprint: settings.toggle_sprint,
+            always_sprint: settings.always_sprint,
+            toggle_sneak: settings.toggle_sneak,
+            ..ControlObservation::default()
+        })
+    }
+
+    /// The player's own always sprint keeps sprinting under a mod's toggle sprint: when the
+    /// mod's modes arrive after the player's (as while joining) and after a menu suspends input.
+    #[test]
+    fn player_always_sprint_survives_a_mods_toggle_sprint() {
+        let player = ui::GameplaySettings {
+            always_sprint: true,
+            ..Default::default()
+        };
+        let modes = ModControlModes(Some(mod_host::GameplayControlModes {
+            toggle_sprint: true,
+            toggle_sneak: false,
+            always_sprint: false,
+        }));
+        let mut controls = ControlModes::default();
+        assert!(walk(&mut controls, 0, ModControlModes(None).apply(player)).sprint_request);
+        let arrived = walk(&mut controls, 50, modes.apply(player));
+        assert!(
+            arrived.sprint_request && !arrived.stop_sprinting,
+            "the mod's modes stopped the player's always sprint"
+        );
+        controls.suspend(false);
+        assert!(
+            walk(&mut controls, 100, modes.apply(player)).sprint_request,
+            "always sprint did not resume after a menu"
+        );
+    }
 
     /// What a sprint key press leaves behind under one set of control settings.
     #[derive(Debug, PartialEq, Eq)]
