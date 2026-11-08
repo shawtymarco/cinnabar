@@ -106,6 +106,7 @@ fn apply(world: &mut World, entries: Vec<Entry>, changes: Vec<Change>) {
     let watcher = world.resource::<Watcher>();
     let generation = watcher.latest.fetch_add(1, Ordering::AcqRel) + 1;
     let registration = Registration {
+        suspended: None,
         version: super::VERSION,
         request_id: format!("request-{generation}"),
         mods: entries,
@@ -261,6 +262,7 @@ fn revoking_one_mod_releases_only_its_authority_before_loader_completion() {
         .lock()
         .unwrap()
         .registration = Some(Registration {
+        suspended: None,
         version: super::VERSION,
         request_id: "off".into(),
         mods: vec![a, b],
@@ -295,6 +297,7 @@ fn an_obsolete_completed_candidate_cannot_replace_the_current_host() {
         Update {
             generation: 1,
             registration: Registration {
+                suspended: None,
                 version: super::VERSION,
                 request_id: "old".into(),
                 mods: vec![a],
@@ -467,6 +470,7 @@ fn restoring_grants_rebuilds_an_instance_revoked_during_pending_admission() {
         .lock()
         .unwrap()
         .registration = Some(Registration {
+        suspended: None,
         version: super::VERSION,
         request_id: "revoke".into(),
         mods: vec![revoked],
@@ -645,11 +649,20 @@ fn reenable_before_disable_acknowledgment_retries_missing_hosts() {
             changes.push(change(other));
         }
         apply(&mut world, entries.clone(), changes);
+        assert!(
+            world.contains_resource::<crate::environment::VisualWeatherOverride>(),
+            "a registered runtime must be able to present its weather override"
+        );
         messages.try_iter().for_each(drop);
         let mut disabled = entries.clone();
         disabled[0].enabled = false;
         apply(&mut world, disabled, Vec::new());
         assert_eq!(world.contains_resource::<ModRuntime>(), keep_other);
+        assert_eq!(
+            world.contains_resource::<crate::environment::VisualWeatherOverride>(),
+            keep_other,
+            "weather override must follow the frame runtime"
+        );
         // Reuse arrives while the coordinator still has the old installed identity.
         apply(&mut world, entries.clone(), Vec::new());
         assert!(matches!(

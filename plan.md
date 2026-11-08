@@ -335,6 +335,11 @@ acceptance remain incomplete; see the [backend contract](crates/render/src/frame
 
 ### Lighting, atmosphere and publication
 
+- Ordinary cube terrain reads encoded fog prepared once per atmosphere upload,
+  retaining the existing linear output and lighting order. Matched-output GPU
+  timing and Metal acceptance remain incomplete; encoded attachment output and
+  material specialization are still unqualified.
+
 - Chunk occlusion culling remains enabled by default and can be disabled in Video
   settings for comparison. It hides only sections proved invisible. The indirect
   renderer samples rejection counts asynchronously and skips GPU
@@ -359,6 +364,11 @@ acceptance remain incomplete; see the [backend contract](crates/render/src/frame
   boxes remain visible, and unavailable tests draw the complete ordered terrain.
   Matched-output frame-time and movement qualification remain incomplete;
   raster occlusion stays off by default pending hardware acceptance.
+
+  Sorted water draws coalesce adjacent contiguous reference ranges after particle
+  interleaving. Pipeline, view, reference gaps and other draw kinds end a batch;
+  model and mixed water/model runs retain their existing draws. Matched-scene
+  encoding-time and target-GPU qualification remain incomplete.
 
 - [ ] `P2.7-ATMOSPHERE` — Complete lighting, day/night, sky, fog, weather and cloud
   acceptance, together with the remaining terrain publication and remesh qualification.
@@ -704,6 +714,11 @@ no native count limit has been found, so this is not yet matched: decoded art pa
 Cinnabar's 1 GiB per-pack ceiling is counted, logged and left out, and deferred loading
 remains confirmed incomplete. The compile cache bounds its 1 GiB by compressed size on disk,
 so a stack whose entity pack is larger uncompressed still reuses its compile after a restart.
+
+Animation timeline keys follow native's schema: only plain decimal keys such as `0.5` are
+times, other keys are ignored, and each channel's keyframes play in time order. A malformed
+animation is skipped on its own while the rest of the stack applies. Native's schema skips
+only an unmatched member; matching that for members other than timeline keys is incomplete.
 
 Client-entity render controllers evaluate each layer's activation, geometry, texture and
 pose in authored order. A completed all-false activation result suppresses the base body
@@ -1296,6 +1311,15 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   client launched during another's entry waits for its lease. X11 reports the request
   before the window manager applies it, so its settle confirmation is incomplete; native
   compositor failure acceptance remains open.
+  Storage lists downloaded server-pack icons, names, versions and IDs with search, individual
+  deletion and a separate clear-all confirmation. Cache housekeeping files and imported
+  packs are excluded. Missing display metadata falls back to the archive filename.
+  A coalescing background worker scans inventories, metadata and icons; loading disables
+  deletion and obsolete scan results cannot replace the latest requested inventory.
+  Missing or unreadable icons use the pack placeholder; optional encoded-icon limits and
+  image-decode budgets are presentation fallbacks, not pack admission limits. Localized names
+  currently use the English pack fallback. Live Windows input and matched native storage
+  acceptance remain incomplete.
   Settings search filters translated option labels, help text and input bindings across
   categories, with editable results and category shortcuts. Desktop live input acceptance
   remains open.
@@ -1669,8 +1693,8 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   physical-phone navigation, cutout or gameplay acceptance.
   Android pack, mod, skin and cape imports open the system document picker and copy the
   chosen documents into app cache storage before importing them, then release each copy after
-  import or rejection. Mod update downloads stage in app-owned storage. Revision-aware mod
-  declarations select compatible releases through the API using the native build's
+  import or rejection. Mod update downloads stage in app-owned storage. Only the official mod's revision-aware
+  declaration selects compatible releases through the API using the native build's
   full stamped commit and supported mod API revisions. New capabilities append a revision
   while retaining older supported revisions; unsupported APIs and catalogue failures
   do not fall back to latest;
@@ -1681,7 +1705,7 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   cache publication use a no-overwrite rename instead of hard links; device acceptance and skin
   imports that need a sibling geometry file remain open.
   Keep browser gesture activation and background work within the host's event-loop rules.
-  Touch-capable hosts expose persisted look sensitivity and control guidance. A utility dropdown, chat and pause share a centered row; the dropdown toggles Debug Overlay and Player List and opens Emotes; inventory access follows the HUD hotbar. The joystick-and-crosshair layout uses proportional movement/action centers and height-based sizes. A Control mode option offers Bedrock's three modes, saved per install and defaulting to tap to interact: joystick or the classic D-pad (default centre and height share, forward diagonals while moving forward, centre jump) for movement, and world taps and holds (0.25 s tap window, 0.4 s hold, 0.05 screen-width turn threshold) or crosshair attack and use buttons for interaction. Unverified and provisional: which action each gesture performs on each target, crosshair visibility per mode, the turn threshold's sensitivity factor, D-pad axis values and diagonal rule, down diagonals, and sneak and sprint in the classic layout. Confirmed gap: the classic D-pad covers the start of bottom-left chat lines. Touchscreen settings offers a touch-control layout draft with dragging, alignment guides, snapping, grid, touch-accessible Undo/Redo, Save, Cancel and Reset; saved positions drive both artwork and hit regions. Mods with the controls grant add up to four labelled buttons each (sixteen shown) in the dropdown's button style; taps complete on release inside the button, reach only the owning mod's next frame, and placements persist by button id in the same editor. The sensitivity curve, movement/action parity, remapping, cutout handling and physical-device layout acceptance remain open.
+  Touch-capable hosts expose persisted look sensitivity and control guidance. A utility dropdown, chat and pause share a centered row; the dropdown toggles Debug Overlay and Player List and opens Emotes; inventory access follows the HUD hotbar. The joystick-and-crosshair layout uses proportional movement/action centers and height-based sizes. A Control mode option offers Bedrock's three modes, saved per install and defaulting to tap to interact: joystick or the classic D-pad (default centre and height share, forward diagonals while moving forward, centre jump) for movement, and world taps and holds (0.25 s tap window, 0.4 s hold, 0.05 screen-width turn threshold) or crosshair attack and use buttons for interaction. Unverified and provisional: which action each gesture performs on each target, crosshair visibility per mode, the turn threshold's sensitivity factor, D-pad axis values and diagonal rule, down diagonals, and sneak and sprint in the classic layout. Confirmed gap: the classic D-pad covers the start of bottom-left chat lines. Touchscreen settings offers a touch-control layout draft with dragging, corner resizing (0.5–3× uniform scale), alignment guides, snapping, grid, touch-accessible Undo/Redo, Save, Cancel and Reset; saved positions and sizes drive both artwork and hit regions. Control resizing is a Cinnabar layout-editor feature with no verified Bedrock size range. Mods with the controls grant add up to four labelled buttons each (sixteen shown) in the dropdown's button style; taps complete on release inside the button, reach only the owning mod's next frame, and placements persist by button id in the same editor. The sensitivity curve, movement/action parity, remapping, cutout handling and physical-device layout acceptance remain open.
   Touch-capable hosts expose persisted look sensitivity and control guidance. A utility dropdown, chat and pause share a centered row; the dropdown toggles Debug Overlay and Player List and opens Emotes; inventory access follows the HUD hotbar. The touch Use button admits block placement and held repeats through the shared block-use handler. The sensitivity curve, movement/action layouts, remapping, customization, cutout handling and device layout acceptance remain open.
   Menu scroll regions and chat history accept captured finger drags; swipes cancel pending taps, and form slider gestures retain their own control. Native gesture calibration and full route/device acceptance remain open.
   Menu text editors request platform keyboards again on field changes and retaps. Android keyboard overlap reduces the UI layout viewport and reveals unchanged menu focus after resize. The People drawer filters the current friend list by gamertag. Global people lookup, gameplay text entry, full composition support and device IME acceptance remain open.
@@ -1701,6 +1725,7 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   removal, consent, custom screen transitions and media qualification. Unmeasured shared
   Ordinary touch controls take focus only after a completed tap, preserving manual scroll positions during pending swipes.
   Menu text editors and Android in-game chat request platform keyboards again on field changes, chat opening and retaps; the platform Back key cancels chat and inventories at its place among keys and acts as a fixed Menu Cancel elsewhere. Android reads keyboard overlap from the active activity to reduce the UI layout viewport and reveal unchanged menu focus after resize; failed geometry reads warn once and temporarily use zero overlap. The People drawer filters the current friend list by gamertag. Global people lookup, sign and book text entry, Back during gameplay, chat IME composition, full composition support and device IME and Back acceptance remain open.
+  Android tracks connected physical mice and alphabetic keyboards and switches gameplay between Touch and Keyboard & Mouse: keyboard or mouse activity, or a device arriving, selects Keyboard & Mouse and hides the touch controls; a gameplay touch outside UI, or the last device leaving, selects Touch. Keyboard & Mouse gameplay requests native pointer capture for relative look, wheel and button input, and releases it with gameplay capture. Desktop and iOS routing are unchanged. Incomplete: phone, tablet and ChromeOS acceptance with USB and Bluetooth devices, uncaptured mouse use in menus, and touchpad and stylus classification.
 - The reusable Dragonfly client-part helper offers bundles and typed wire v2 messages;
   the local server imports the same implementation. Explicit world notices fence
   messages before notice admission until the client acknowledges that specific
@@ -2144,8 +2169,18 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
 Marketplace delivery implements account-scoped library transport, exact signed
 release/hash verification, disabled installation with explicit permission consent
 capped to the signed grants, signed revocation freshness and conditional library
-removal. A send whose compatibility check or installation fails after handoff to
-the library worker is not retried until an account change or restart. Production signing
+removal. Compatible marketplace updates use the native supported API revisions,
+require a signed matching API revision and honor mod check/automatic-install settings.
+Unchanged or reduced grants fence predecessor admission while retaining its enabled
+selection, drain final settings writes and atomically copy settings before transferring
+enabled state, order and capped permission choices. Pre-transfer failures release the
+fence; post-transfer retries preserve successor saves while retiring the old release.
+Successor receipts retain pending migration and consumed website sends, so
+periodic checks, manual requests and restarts resume interrupted migrations. Expanded
+grants stage disabled beside the old version until Enable. Other local mods' declared update sources are ignored; only the official
+package retains the revision-checked first-party update path. An initial website send
+whose compatibility check or installation fails after handoff to the library worker
+is not retried until an account change or restart. Production signing
 public keys are pinned in the client. Home and Mods link to the catalogue and
 explain account sign-in, website sends and explicit permission review while
 preserving local imports. Production deployment and real-domain/cross-platform
