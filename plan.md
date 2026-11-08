@@ -677,6 +677,13 @@ Missing copper armour definitions reuse standard pack definitions when the match
 textures are present. Authored item bindings retain precedence.
 Multi-pass body equipment and matched native visual qualification remain incomplete.
 
+Villager and zombie-villager profession layers retain their authored second sampler
+and colored transparent keep masks alongside biome clothing. Babies and unemployed
+villagers retain their authored material choices. The pinned villager brim provisionally
+uses the sibling zombie model's bind; its native villager default remains unverified.
+Matched native captures, masked-material MSAA edge qualification, single-texture masked
+material parity and independent server-pack sampler overrides remain incomplete.
+
 Server-pack attachables can supply worn and held models, with an optional item-icon
 fallback for held models. Packs that only re-texture the stock bow or crossbow keep the
 attachable's poses in Bedrock animations, matching native first- and third-person draws, and
@@ -1060,6 +1067,11 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   still leaves some blank; that bound is incomplete parity work.
 - [ ] `P5.2-HUD` — Close received text, titles, actionbar, toasts, survival/status HUD
   and lifecycle behavior without leaking UI-owned input into movement.
+  Server locator packets now reach session-owned locations and the pack-positioned bar
+  in Survival and Creative, with explicit hiding and temporary XP display. Locator
+  distance-dependent icons, legacy color selection, tracked-actor fallback behavior,
+  XP/anvil/enchanting timing and exact projection remain provisional and incomplete
+  pending native-reference and rendered-frame acceptance; they do not close this gate.
   Server language values decode newline and backslash escapes before text arguments
   are inserted, preserving multiline HUD text. Broader HUD acceptance remains open.
   The HUD paper doll retains its source geometry and samples its own GPU bone palette while
