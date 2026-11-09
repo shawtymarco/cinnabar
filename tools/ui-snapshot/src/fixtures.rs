@@ -643,6 +643,12 @@ const STATES: &[State] = &[
         fixture: out_of_game::play_worlds,
     },
     State {
+        name: "play-worlds-gamepad",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: out_of_game::play_worlds_gamepad,
+    },
+    State {
         name: "play-worlds-importing",
         size: SIZE,
         gui_scale: GUI_SCALE,
@@ -978,6 +984,7 @@ pub fn settings(section: &str) -> MenuView {
 pub fn states() -> impl Iterator<Item = &'static State> {
     STATES
         .iter()
+        .chain(out_of_game::STATES)
         .chain(out_of_game::WORLD_FORM_STATES)
         .chain(updates::STATES)
         .chain(shader_pack::STATES)

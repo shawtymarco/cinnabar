@@ -197,6 +197,10 @@ acceptance remain incomplete; see the [backend contract](crates/render/src/frame
   only from the server's update: native places both halves and colors them locally, and a
   prediction needs the same block entity color. Their local room check accepts any non-empty
   support; stricter native support and liquid rules remain unverified.
+  A bed head with no block entity, or one naming no known dye, draws red, or the foot half's dye
+  when only that half has an entity; a bed's break crack covers the cell up to mattress height.
+  The red default and the crack height are unverified against native, and a foot entity in the
+  neighbouring chunk recolours the head only after the head's own chunk next changes.
 - [ ] Close paired-door presentation and interaction acceptance. Side faces mirror by the
   native swung-direction, open and hinge rule, and caps stretch the outer art rows along the
   leaf. Remaining: lower/upper state resolution, cross-subchunk neighbours, missing pairs, highlights, cracks,
@@ -724,6 +728,10 @@ the worn slot through owner placement; worn equipment counts exclude hands.
 Missing copper armour definitions reuse standard pack definitions when the matching
 textures are present. Authored item bindings retain precedence.
 Multi-pass body equipment and matched native visual qualification remain incomplete.
+Inventory and HUD player models draw prepared block headgear on the captured head pose,
+using the world renderer's shared placement. Headgear scale, vertical placement and held
+pumpkin orientation still need native visual qualification; other player previews remain
+incomplete. Inactive UI body controllers suppress block headgear with the body.
 
 Villager and zombie-villager profession layers retain their authored second sampler
 and colored transparent keep masks alongside biome clothing. Babies and unemployed
@@ -881,6 +889,16 @@ and version-matched in-game acceptance remain incomplete.
   whether that matches native behavior is unverified. Cubes declared with the versioned full-block
   geometry keep their icon and turn their held bottom face; the held rotation is inferred from the
   placed geometry rather than a native carried-block comparison.
+  Custom blocks with server placing handlers (`hasPlayerPlacing`, version 1 components) are
+  left to the server's block updates without local collision prediction. Full-cube bridge
+  targeting uses held placement history independently of that prediction override.
+  Matched native packet and rendered comparisons remain incomplete.
+  A held repeat that fails locally, such as a bridge cell overlapping the jumping player, sends
+  at most one use per clicked block and face per tick, preserving distinct buffered targets;
+  native's per-target count of failed held uses remains incomplete and unverified.
+  Full-cube custom blocks continue held bridges like vanilla's cube family; whether native
+  grants build intention to custom stairs, slabs or other partial shapes remains incomplete
+  and unverified, so they keep following the aim ray.
   Held stacks whose wire descriptor names a block state with an aux value that has no compiled
   visual hold that state; a state with no prepared art, such as a turned log or a facing stairs,
   holds its item's base block, which remains an incomplete approximation of native's exact state.
@@ -1074,6 +1092,10 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   full menu visual and hardware frame-work acceptance remains open.
   Mods use explicit open, close and toggle requests for their panels; the latest opening owns
   input and closes other panels. Panel content rejects the removed shortcut metadata.
+  Play tabs switch with `[` / `]` and the bumpers, as Bedrock's view-scoped
+  `button.menu_tab_left` / `button.menu_tab_right`, with keycap hints beside the tab bar.
+  Incomplete: stopping at the first and last tab is unverified against native, and the
+  bumper hint always reads LB / RB rather than the connected controller's own glyph.
   Packet reactors use grant-gated panel and physical-input imports; hardware acceptance
   remains pending.
   Client-owned panel collections support bounded five-column card grids with
@@ -1265,6 +1287,8 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   bypass, allow/deny/border blocks and live mining acceptance remain incomplete.
   Server items whose `minecraft:shooter` draws start a held use that release ends;
   shooters with ammunition entries or `charge_on_draw` remain incomplete.
+  A food or drink item that declares a zero use duration takes the standard 32-tick consume time,
+  as Hive's custom potions need; native handling of a zero duration remains unverified.
   Fishing rods predict a fresh-press swing and choose cast artwork from live hook ownership.
   A hook's fish-position, bite and tease events draw the native trail, bite and tease
   particles and play the bite splash. The bite's client-side downward hook impulse is not
@@ -1287,8 +1311,15 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   acceptance remain incomplete.
 - [ ] `P5.6-FORMS` — Close modal/menu/custom form navigation, validation, cancellation
   and responses, including server-pack definitions, structured text, custom controls,
-  scaling and image/layout behavior against matched native views. Overlapping requests
-  keep the active form and answer busy, including reused IDs.
+  scaling and image/layout behavior against matched native views.
+  Simple automatic server-form entrance chains whose size or offset remains authoritative
+  in placement feed dimensional expressions into layout, clipping, culling and actual-state
+  hit regions. Anchored offset replacements and widget/pointer-owned placement retain the
+  legacy paint path; their layout composition remains incomplete. Event/reset,
+  render-wait, destruction, mixed and generic-screen animation semantics retain their
+  legacy paths and remain incomplete. Keyword endpoints, complex child/sibling dependencies
+  and native-view/performance acceptance remain unverified.
+  Overlapping requests keep the active form and answer busy, including reused IDs.
   Answered button and custom forms retain their rendered surface for an explicitly provisional
   250 ms handoff grace: a replacement received in that window swaps in place, otherwise the
   surface expires while input edges stay consumed. Version-matched native timing and visual
@@ -1455,6 +1486,14 @@ Core transfer/disconnect terminals can abandon unfinished join preparation; ordi
 preparation and presentation readiness remain required for a successful join. Live
 server latency impact and the complete transfer acceptance matrix remain unqualified.
 
+Realm membership: invitation codes are verified, then accepted only after confirmation.
+Realms owned by another XUID list as joined, offer Leave Realm with vanilla's
+`playscreen.confirmLeave*` confirmation, and are removed once `DELETE /invites/<id>` succeeds.
+The leave endpoint follows community references (MinecraftAuth, wiki.vg), not a native capture.
+Incomplete: live remote acceptance and leave, pending-invitation acceptance, subscription creation,
+multiplayer permission admission, service-specific errors, the native confirm popup's button
+labels, and OreUI placement parity for Leave. This does not close the Realm management parity gate.
+
 Server pack acquisition, handoff and stack composition no longer impose fixed archive-count
 or compressed-byte quotas. Saved server lists retain every imported entry. Declared sizes,
 identity, digests and framing remain validated. Experience selections preserve service errors
@@ -1496,7 +1535,12 @@ potions, clock and compass atlases from frames or pre-1.9 strips, the legacy HUD
 so vanilla's `.tga` cannot shadow them, and grass sides are composed into Bedrock's tint masks.
 Every vanilla 1.7.10 and 1.8.9 block and item texture with a Bedrock counterpart maps to it, and
 their HUD crops match pixel for pixel. Translation holds at most 1 GiB of decoded and derived
-pixels, an implementation bound rather than a vanilla limit. The
+pixels, an implementation bound rather than a vanilla limit.
+Compasses and clocks animate with a pack's own strips: its `compass_atlas`, `recovery_compass_atlas`
+and `watch_atlas` images, shown at the native 32 and 64 frames. A strip under the Java item name
+(`compass.png`, `clock.png`) in a Bedrock pack at exactly the native frame count is also used.
+That Java-named route is a provisional approximation with no vanilla counterpart, so it closes no
+parity gate; a partial strip is ignored rather than mixed with base frames. The
 Java-to-Bedrock name tables and potion tints were derived outside the repository by matching
 Java Edition client textures against bedrock-samples; a fixture-gated test checks every table
 target and the flipbook list against the pinned sample pack, but no pinned Java source checks the
@@ -1524,8 +1568,10 @@ confirmed values and show a retry message in Game; failed console writes show a 
 Save replies refresh all confirmed settings and retain newer pending selections. World toggles keep
 keyboard and gamepad focus across value changes. A successful save clears superseded errors for its
 settings, while unrelated save failures remain visible. Live edits remain pending until a successful
-server exit. Default game mode and default player permission changes still wait for the next
-start; live application of these settings remains an incomplete parity gap. Pack and experiment
+server exit. Changing the default game mode also sends a targeted console command for the connected
+host; the world default and default player permission still take effect on the next start. Console
+write success does not confirm the server applied the player mode; live acceptance and native
+settings parity remain incomplete. Pack and experiment
 configuration, hardcore, flat presets, Education Edition, operator status for a signed-out or
 offline-fallback host, the in-game Personal Game Mode and Multiplayer section, and live acceptance
 of every option on supported platforms remain incomplete.
@@ -1729,7 +1775,10 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   stop at the rendered distance, so only fog would move. Bedrock's dynamic resolution is
   unverified outside Vibrant Visuals. Physical-phone performance acceptance remains incomplete.
   Android restores immersive system bars on resume, window focus and keyboard dismissal,
-  while preserving keyboard control. Device-window regression coverage does not close
+  while preserving keyboard control. Native UI receives display-cutout insets combined with
+  keyboard overlap at the window's DPI, while the world surface stays full size.
+  The crosshair uses that full viewport while edge controls stay inside the safe area.
+  Device-window regression coverage does not close
   physical-phone navigation, cutout or gameplay acceptance.
   Android pack, mod, skin and cape imports open the system document picker and copy the
   chosen documents into app cache storage before importing them, then release each copy after
