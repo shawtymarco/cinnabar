@@ -166,6 +166,11 @@ acceptance remain incomplete; see the [backend contract](crates/render/src/frame
   matched chest-particle presentation and custom destruction overrides remain incomplete.
   Mining particles accept packed and face-specific block events, preserving full hashed
   identities and the event's block material; matched in-world capture acceptance remains open.
+- [ ] Qualify legacy particle events (`LevelEvent` `0x4000 | type` and 2009), which use the
+  native `ParticleType` enum. For types without a dedicated handler, native emits one particle
+  manually; Cinnabar runs the pack emitter instead, so burst counts may differ, and dragon
+  breath (49) stays unmapped because its lingering emitter needs cloud variables. Types 1, 25
+  and 52 have no identified native handler; the 1.26.60 client handlers are not yet compared.
 - [ ] Close straw-bed native-gallery and replacement-pack acceptance. Both halves
   use pack geometry and face corners in all four directions at full sheet resolution,
   with a quarter-block collision and selection box; sleeping and in-game breaking
@@ -586,6 +591,32 @@ tick keeps its place; one spawning later boards behind. The controller is the pl
 controlling seat of a boat or a saddled, tamed horse. Deviation: vanilla drops a link whose
 actor is missing at its tick and relies on spawn-embedded links; Cinnabar keeps it until
 either actor is removed, so a server that never re-links still seats the rider.
+Getting off a mount places the player client-side, as vanilla's client does unless the mount
+is flagged for server-only dismounts: the player tries the eight blocks around the vehicle
+across its heading first, at its level, a block up, then a block down, stands on the first
+with a floor and room, and reports that position in its stop-riding request. Without a free
+block it stays at its seat. It gets off only in a tick where transport takes the request
+once nothing from the seat is still outbound (movement queued or not yet written, a held
+item release, attack, block-use or item-release work), the last tick completed and every
+column around the mount has arrived. While seated movement already produced is still going
+out the frame runs no ticks, so the backlog drains and input does not move the mount; a
+release facing a tick still to come lets the ticks run. That hold is decided once per frame
+as block use starts, before item use and movement read whether a tick runs, so a buffered
+pick or a server item-use write waits for the tick that does run; a press first seen in a
+frame holds from the next frame. Once off, the
+client world's mount view rides the player on nothing until the server's links for it
+change; movement, seat pose, view lock, animation, actor picking and collision read that
+view, so a link the server sends again seats the player for all of them, while the
+committed link waits for the server's unlink; another vehicle's unlink leaves it. A player
+left inside the vehicle's box (no free exit, as in open water) passes through the vehicle
+until it no longer overlaps it, rather than being lifted on top. Incomplete: that
+pass-through is unverified, since vanilla's overlap handling in its swept collision could
+not be read and only its push path is known to skip the vehicle just left; the still-vehicle motion
+threshold is unverified; each block counts as one box around its collision shapes; blocks
+vanilla exempts by flag or state other than scaffolding are not exempted; legacy worlds'
+older exit patterns and activator-rail ejection are not implemented; until the server's
+unlink arrives, the HUD, inventory, item use and mining speed still treat the player as
+mounted.
 Server-driven gameplay pose and item-use starts, Riptide flag lifetimes,
 block-climber flags, custom collision definitions, transition-tick packet ordering
 and broader live-server qualification remain incomplete.
@@ -1528,6 +1559,11 @@ platforms. Missing source music/ambience requires lawful local input or the docu
 fallback; do not bundle game assets to fill gaps.
 Native audio follows changes to the system default output on its owner thread, retaining
 active and queued sounds across output replacement and retrying unavailable devices.
+The first failure of each outage is logged as a warning, and an outage that outlasts a
+handoff raises one in-game toast with the platform's likeliest fix; the log links the
+[sound troubleshooting guide](docs/audio-troubleshooting.md). Unit tests cover the outage
+threshold and toast; the three-second threshold is provisional, and live acceptance with a
+real unavailable output and the guide's per-distribution steps remain incomplete.
 The sound-definition catalog matches the current sample-pack pin; compiler coverage
 checks a UI sound and guards the manifest associated with the sound-definition digest.
 JSON-UI and container controls play their declared press sounds, and OreUI controls play the theme
@@ -1903,6 +1939,12 @@ launches. Native Windows startup, update and crash-restart acceptance remains in
   positions/link acceptance and mixed-client rendering remain incomplete.
   Client epoch receipt, rendered destination readiness, crash recovery and live transfer acceptance
   remain incomplete.
+- Mods can submit retained face-coverage rules under `render_material`: named block
+  groups sharing face-relative neighbour predicates and three-by-three surface partitions.
+  Full-cell, untransformed, non-occluding model faces with alpha materials retain pack geometry and UV mapping
+  in the remaining patches. Selection, collision and destruction overlays are unchanged.
+  World changes and rule removal restore ordinary meshing. Headless module captures verify
+  activation, restoration, breaking and outlines; pack-reload and performance qualification remain open.
 - The mod `presentation` capability sets native nametag parameters, per-actor nametag and
   player-list annotation spans, damage overlay colours, per-actor overlay tints, item tooltip
   lines and clickable chat spans, merged across mods in load order. `facts` reads the pinned
@@ -2185,10 +2227,10 @@ grants stage disabled beside the old version until Enable. Other local mods' dec
 package retains the revision-checked first-party update path. An initial website send
 whose compatibility check or installation fails after handoff to the library worker
 is not retried until an account change or restart. Production signing
-public keys are pinned in the client. Home and Mods link to the catalogue and
-explain account sign-in, website sends and explicit permission review while
-preserving local imports. Production deployment and real-domain/cross-platform
-interactive acceptance remain incomplete; see
+public keys are pinned in the client. The in-game marketplace entry points are
+hidden until the marketplace launches publicly. Mods retains account sign-in,
+website sends, explicit permission review and local imports. Production deployment
+and real-domain/cross-platform interactive acceptance remain incomplete; see
 [marketplace installation](docs/marketplace.md). No vanilla parity gate is closed
 by this optional client feature.
 
