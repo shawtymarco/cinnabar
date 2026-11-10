@@ -34,6 +34,11 @@ struct Published {
 #[derive(Resource, Default)]
 struct CulledView(Option<Entity>);
 
+/// Set once device startup has finished and the app renders frames. Startup allocates the
+/// minimal arena, which is required rather than grown, so faults apply only after it.
+#[derive(Resource, Clone, Default)]
+struct Rendering(Arc<std::sync::atomic::AtomicBool>);
+
 /// Reads the logical publication and the geometry bytes referenced by its GPU draws.
 fn published(app: &mut App) -> Published {
     let world = app.sub_app_mut(RenderApp).world_mut();
@@ -136,6 +141,15 @@ fn published(app: &mut App) -> Published {
     }
 }
 
+/// DX12's software adapter, which takes tens of seconds to build each terrain app's pipelines.
+fn warp(app: &App) -> bool {
+    let info = app
+        .sub_app(RenderApp)
+        .world()
+        .resource::<bevy::render::renderer::RenderAdapterInfo>();
+    info.backend == wgpu::Backend::Dx12 && info.device_type == wgpu::DeviceType::Cpu
+}
+
 /// Runs render schedules on this thread, where the allocation fault injector applies.
 fn single_threaded(app: &mut App) {
     let render = app.sub_app_mut(RenderApp);
@@ -168,6 +182,16 @@ fn terrain_app(culling: bool, direct: bool, hardware: bool) -> Option<App> {
     single_threaded(&mut app);
     app.sub_app_mut(RenderApp)
         .init_resource::<CulledView>()
+        .init_resource::<Rendering>()
+        .add_systems(
+            Render,
+            (|rendering: Res<Rendering>| {
+                rendering
+                    .0
+                    .store(true, std::sync::atomic::Ordering::Relaxed);
+            })
+            .in_set(RenderSystems::ExtractCommands),
+        )
         .add_systems(
             Render,
             (|frame: Res<GpuCullFrame>, mut culled: ResMut<CulledView>| {
@@ -290,6 +314,13 @@ fn recovery_table(hardware: bool) {
             eprintln!("missing-fixture: terrain recovery GPU adapter");
             return;
         };
+        if hardware && warp(&fresh) {
+            eprintln!(
+                "missing-fixture: terrain recovery GPU adapter other than DX12 WARP, which \
+                 builds each table app's pipelines too slowly to finish the table"
+            );
+            return;
+        }
         let mut recovering = terrain_app(culling, direct, hardware).unwrap();
         if site == "far terrain quads" {
             // One draw requires growth; room for further tiles is optional and may back off.
@@ -309,29 +340,32 @@ fn recovery_table(hardware: bool) {
         for _ in 0..4 {
             frame(&mut fresh);
         }
-        // Metal deliberately uses direct submission, so indirect/cull storage has no growth.
-        if hardware
+        // Metal deliberately uses direct submission, so indirect-only sites may never allocate
+        // there. The coverage check below still requires a case for every allocated site.
+        let direct_only = hardware
             && !direct
             && fresh
                 .sub_app(RenderApp)
                 .world()
                 .get_resource::<GpuCull>()
-                .is_none()
-            && (site.starts_with("terrain cull ")
-                || site == "packed chunk indirect commands"
-                || site == "terrain indirect upload")
-        {
-            continue;
-        }
+                .is_none();
         let failures = Rc::new(Cell::new(0));
         {
             let injected = Rc::clone(&failures);
             let observed = Rc::clone(&observed);
+            let rendering = recovering
+                .sub_app(RenderApp)
+                .world()
+                .resource::<Rendering>()
+                .0
+                .clone();
             let _failure = crate::gpu_allocation::inject_with_owner(move |label, _, terrain| {
-                if terrain || label == site {
+                // Startup allocations are required rather than grown, so they need no case.
+                let rendering = rendering.load(std::sync::atomic::Ordering::Relaxed);
+                if rendering && (terrain || label == site) {
                     observed.borrow_mut().insert(label.to_owned());
                 }
-                let fail = label == site;
+                let fail = label == site && rendering;
                 injected.set(injected.get() + usize::from(fail));
                 fail
             });
@@ -367,11 +401,13 @@ fn recovery_table(hardware: bool) {
                         .request_test_growth();
                 }
             }
+            if direct_only && failures.get() == 0 {
+                continue;
+            }
             assert!(failures.get() > 0, "{site} was never allocated");
         }
         covered.insert(site.to_owned());
         recover(&mut recovering);
-        assert_eq!(published(&mut recovering), published(&mut fresh), "{site}");
         assert_eq!(
             updates(&recovering),
             if site == "retained terrain upload staging" {
@@ -390,7 +426,19 @@ fn recovery_table(hardware: bool) {
             KEYS.len(),
             "{site} acknowledged an upload twice"
         );
+        // Occlusion admission samples by frame, and verdicts restart with the rebuilt generation
+        // until the readback ring returns them. Compare at the same frame once they have settled.
+        while frame_count(&fresh) < frame_count(&recovering) {
+            frame(&mut fresh);
+        }
+        for _ in 0..=crate::gpu_timing::readback::SLOTS {
+            frame(&mut fresh);
+            frame(&mut recovering);
+            assert_eq!(updates(&recovering), 0, "{site} uploaded again");
+        }
+        assert_eq!(published(&mut recovering), published(&mut fresh), "{site}");
         // Once rebuilt, another frame retains the exact publication without uploading it again.
+        frame(&mut fresh);
         frame(&mut recovering);
         assert_eq!(
             published(&mut recovering),
@@ -399,10 +447,10 @@ fn recovery_table(hardware: bool) {
         );
         assert_eq!(updates(&recovering), 0, "{site}");
     }
+    let missing: Vec<_> = observed.borrow().difference(&covered).cloned().collect();
     assert!(
-        observed.borrow().iter().all(|site| covered.contains(site)),
-        "allocation sites missing a failure case: {:?}",
-        observed.borrow()
+        missing.is_empty(),
+        "allocation sites missing a failure case: {missing:?}"
     );
 }
 
@@ -731,6 +779,11 @@ fn drawable(app: &App) -> bool {
         .resource::<ChunkGpuArena>()
         .bind_group
         .is_some()
+}
+
+/// Frames this app has run.
+fn frame_count(app: &App) -> u32 {
+    app.world().resource::<bevy::diagnostic::FrameCount>().0
 }
 
 /// Counts geometry payloads uploaded in the latest deterministic render frame.

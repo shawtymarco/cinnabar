@@ -122,13 +122,13 @@ pub use compiled::{
     MATERIAL_FLAG_FOLIAGE_CLASS_MASK, MATERIAL_FLAG_FOLIAGE_TINT, MATERIAL_FLAG_GRASS_TINT,
     MATERIAL_FLAG_ISOTROPIC, MATERIAL_FLAG_LIQUID_DEPTH_WRITE, MATERIAL_FLAG_NATIVE_LEAF_COLOUR,
     MATERIAL_FLAG_OVERLAY_MASK, MATERIAL_FLAG_ROTATE_UV, MATERIAL_FLAG_SEASONAL_FOLIAGE,
-    MATERIAL_FLAG_TINT_MASK, MATERIAL_FLAG_TWO_SIDED, MATERIAL_FLAG_UV_MASK,
-    MATERIAL_FLAG_UV_ROTATE_180, MATERIAL_FLAG_UV_ROTATE_270, MATERIAL_FLAG_UV_ROTATION_MASK,
-    MATERIAL_FLAG_WATER_TINT, MATERIAL_FLAGS_MASK, MATERIAL_LEAF_AO_EXPONENT_MASK,
-    MATERIAL_LEAF_AO_EXPONENT_MAX, MATERIAL_LEAF_AO_EXPONENT_SCALE,
+    MATERIAL_FLAG_TINT_MASK, MATERIAL_FLAG_TWO_SIDED, MATERIAL_FLAG_UV_INVERT,
+    MATERIAL_FLAG_UV_MASK, MATERIAL_FLAG_UV_ROTATE_180, MATERIAL_FLAG_UV_ROTATE_270,
+    MATERIAL_FLAG_UV_ROTATION_MASK, MATERIAL_FLAG_WATER_TINT, MATERIAL_FLAGS_MASK,
+    MATERIAL_LEAF_AO_EXPONENT_MASK, MATERIAL_LEAF_AO_EXPONENT_MAX, MATERIAL_LEAF_AO_EXPONENT_SCALE,
     MATERIAL_LEAF_AO_EXPONENT_SHIFT, MATERIAL_LEAF_METADATA_MASK, MAX_CARRIER_TEXTURE_LAYERS,
     MAX_CARRIER_TEXTURE_PAGES, MAX_MATERIALS, MAX_TEXTURE_LAYERS, Material, TEXTURE_LAYER_MASK,
-    material_leaf_ao_exponent,
+    material_leaf_ao_exponent, material_position_random, positional_material_id,
 };
 pub use effects::{EFFECT_DESCRIPTORS, EffectDescriptor};
 pub use effects::{effect_descriptor, effect_descriptor_by_identifier, effect_registry_version};
@@ -242,7 +242,7 @@ pub use model::{
     MODEL_UV_SCALE, ModelQuad, ModelTemplate, NETHER_PORTAL_IDENTIFIER, NO_ANIMATION,
     NO_MODEL_TEMPLATE, SEASONAL_LEAF_DEEP_OFFSET, SEASONAL_LEAF_EXPOSED_OFFSET,
     SEASONAL_LEAF_MATERIAL_COUNT, SNOWED_GRASS_SIDE_TEXTURE, TEXTURE_PAGE_MASK, TEXTURE_PAGE_SHIFT,
-    TOP_SNOW_LAYER_COUNT, TexturePage, TextureRef, VisualKind, VisualSupport,
+    TOP_SNOW_LAYER_COUNT, TerrainMarker, TexturePage, TextureRef, VisualKind, VisualSupport,
     bubble_column_quad_count, item_model_template, model_template_parts, scaffolding_is_supported,
     whole_sheet_model_template, world_aligned_uv,
 };
@@ -268,8 +268,8 @@ pub use provenance::{
 pub use registry::{
     BeaconTint, BlockFlags, CollisionBox, CollisionConfidence, CollisionSeed, ContributorRole,
     ModelFamily, ModelState, ModelStateField, RegistryProvenance, RegistryRecord,
-    pinned_block_identity, pinned_block_state_by_name, read_registry, read_registry_for_protocol,
-    registry_header_protocol,
+    pinned_block_identity, pinned_block_model_family, pinned_block_state_by_name, read_registry,
+    read_registry_for_protocol, registry_header_protocol,
 };
 pub use runtime::{
     BlockOverlay, MaterialOverride, NetworkIdMode, ResolvedBlock, ResolvedFace, RuntimeAssets,
