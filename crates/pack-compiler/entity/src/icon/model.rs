@@ -1,11 +1,11 @@
-//! Depth-tested and alpha-tested block thumbnails from shared GUI geometry.
+//! Alpha-tested block thumbnails from shared GUI geometry and surface ordering.
 //! Includes slabs, stairs, walls, glass and server custom blocks.
 
 use std::sync::Arc;
 
 use assets::gui_item::{
     GUI_BLOCK_ALPHA_THRESHOLD, GUI_ITEM_SIDE, GuiBlockReject, GuiShading, block_gui_quads,
-    cube_face, material_tile,
+    block_gui_uses_paint_order, cube_face, material_tile,
 };
 use assets::{
     BlockFace, BlockOverlay, BlockVisualId, IconSprite, Material, ModelQuad, ModelTemplate,
@@ -84,6 +84,7 @@ pub(super) struct Model<'a> {
     light: f32,
     face_lighting: bool,
     shading: GuiShading,
+    paint_order: bool,
 }
 
 impl<'a> Model<'a> {
@@ -113,6 +114,7 @@ impl<'a> Model<'a> {
             light,
             face_lighting: true,
             shading: GuiShading::Inventory,
+            paint_order: false,
         }
     }
 
@@ -122,7 +124,12 @@ impl<'a> Model<'a> {
         self
     }
 
-    pub(super) fn read(world: &'a RuntimeAssets, visual: BlockVisualId) -> Result<Self, Reject> {
+    /// Reads a compiled state with its item identity for GUI-specific shapes.
+    pub(super) fn read(
+        world: &'a RuntimeAssets,
+        visual: BlockVisualId,
+        render_kind: assets::facts::BlockRenderKind,
+    ) -> Result<Self, Reject> {
         if visual.0 as usize >= world.visual_count() {
             return Err(Reject::Geometry);
         }
@@ -138,7 +145,13 @@ impl<'a> Model<'a> {
             tint: None,
         };
         let faces = BlockFace::ALL.map(|face| block.face(face).material_id());
-        Self::build(parts, block.kind(), faces, block.model_template())
+        Self::build(
+            parts,
+            block.kind(),
+            faces,
+            block.model_template(),
+            render_kind,
+        )
     }
 
     /// State `visual` of a session block overlay.
@@ -157,7 +170,7 @@ impl<'a> Model<'a> {
             tint,
         };
         let template = (block.model_template != NO_MODEL_TEMPLATE).then_some(block.model_template);
-        Self::build(parts, block.kind, block.faces, template)
+        Self::build(parts, block.kind, block.faces, template, Default::default())
     }
 
     /// Draws carried cube faces from overlay pixels without cloning the texture page.
@@ -173,7 +186,7 @@ impl<'a> Model<'a> {
             textures: Textures::Overlay(overlay, base),
             tint: None,
         };
-        Self::build(parts, VisualKind::Cube, faces, None)
+        Self::build(parts, VisualKind::Cube, faces, None, Default::default())
     }
 
     fn build(
@@ -181,6 +194,7 @@ impl<'a> Model<'a> {
         kind: VisualKind,
         materials: [u32; 6],
         template: Option<u32>,
+        render_kind: assets::facts::BlockRenderKind,
     ) -> Result<Self, Reject> {
         let mut tiles = std::collections::BTreeMap::new();
         if kind == VisualKind::Cube {
@@ -192,44 +206,54 @@ impl<'a> Model<'a> {
                 }
             }
         }
-        let faces = block_gui_quads(kind, materials, template, parts.templates, parts.quads)
-            .map_err(reject)?
-            .into_iter()
-            .filter(|quad| quad.visible_in_gui())
-            .map(|quad| {
-                let tile = match tiles.entry(quad.material) {
-                    std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
-                    std::collections::btree_map::Entry::Vacant(entry) => {
-                        entry.insert(tile(parts, quad.material)?)
-                    }
-                };
-                Ok(Face {
-                    corners: quad.corners,
-                    uvs: quad.uvs.map(|uv| {
-                        uv.map(|component| {
-                            let turned = if tile.rotated {
-                                1.0 - component
-                            } else {
-                                component
-                            };
-                            turned * tile.uv_scale
-                        })
-                    }),
-                    tile: tile.pixels.clone(),
-                    size: [tile.side; 2],
-                    blend: tile.blend,
-                    face_dimming: parts.materials[quad.material as usize].flags
-                        & assets::MATERIAL_FLAG_DISABLE_FACE_DIMMING
-                        == 0,
-                })
+        let faces = block_gui_quads(
+            render_kind,
+            kind,
+            materials,
+            template,
+            parts.templates,
+            parts.quads,
+        )
+        .map_err(reject)?
+        .into_iter()
+        .filter(|quad| quad.visible_in_gui())
+        .map(|quad| {
+            let tile = match tiles.entry(quad.material) {
+                std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    entry.insert(tile(parts, quad.material)?)
+                }
+            };
+            Ok(Face {
+                corners: quad.corners,
+                uvs: quad.uvs.map(|uv| {
+                    uv.map(|component| {
+                        let turned = if tile.rotated {
+                            1.0 - component
+                        } else {
+                            component
+                        };
+                        turned * tile.uv_scale
+                    })
+                }),
+                tile: tile.pixels.clone(),
+                size: [tile.side; 2],
+                blend: tile.blend,
+                face_dimming: parts.materials[quad.material as usize].flags
+                    & assets::MATERIAL_FLAG_DISABLE_FACE_DIMMING
+                    == 0,
             })
-            .collect::<Result<Vec<_>, Reject>>()?;
+        })
+        .collect::<Result<Vec<_>, Reject>>()?;
         Ok(Self {
             faces,
             projection: assets::gui_item::project_cube,
             light: 1.0,
             face_lighting: true,
             shading: GuiShading::of(kind, template, parts.templates),
+            paint_order: block_gui_uses_paint_order(
+                template.and_then(|id| parts.templates.get(id as usize)),
+            ),
         })
     }
 
@@ -261,6 +285,7 @@ impl<'a> Model<'a> {
             light: 1.0,
             face_lighting: true,
             shading: GuiShading::Inventory,
+            paint_order: false,
         }
     }
 
@@ -268,7 +293,7 @@ impl<'a> Model<'a> {
         let mut pixels = vec![0u8; SIDE * SIDE * 4];
         let mut depth = vec![f32::INFINITY; SIDE * SIDE];
         let mut fragments = vec![Vec::new(); SIDE * SIDE];
-        for face in &self.faces {
+        for (index, face) in self.faces.iter().enumerate() {
             let brightness = if self.face_lighting && face.face_dimming {
                 self.shading.brightness(face.corners)
             } else {
@@ -277,6 +302,8 @@ impl<'a> Model<'a> {
             let points = face.corners.map(|point| {
                 let [x, y, z] = (self.projection)(point);
                 let scale = SIDE as f32 / GUI_ITEM_SIDE;
+                // Later faces cover earlier ones when the GUI uses paint order.
+                let z = if self.paint_order { -(index as f32) } else { z };
                 [scale * x, scale * y, z]
             });
             for indices in [[0, 1, 2], [0, 2, 3]] {
@@ -299,6 +326,9 @@ impl<'a> Model<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod ordering_tests;
 
 /// Reads a material tile and preserves a session overlay's source texture scale.
 fn tile(parts: Parts<'_>, id: u32) -> Result<Tile<'_>, Reject> {
@@ -582,6 +612,7 @@ mod review_tests {
                 VisualKind::Model,
                 [1; 6],
                 Some(0),
+                Default::default(),
             )
             .unwrap()
             .raster();
@@ -641,7 +672,7 @@ mod review_tests {
             tint: None,
         };
         let uvs = |faces| {
-            Model::build(parts, VisualKind::Cube, faces, None)
+            Model::build(parts, VisualKind::Cube, faces, None, Default::default())
                 .ok()
                 .unwrap()
                 .faces
@@ -709,6 +740,7 @@ mod review_tests {
             VisualKind::Model,
             [1; 6],
             Some(0),
+            Default::default(),
         )
         .unwrap();
         assert_eq!(model.faces.len(), quads.len());

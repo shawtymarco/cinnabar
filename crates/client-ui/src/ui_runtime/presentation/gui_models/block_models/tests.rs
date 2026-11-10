@@ -56,6 +56,7 @@ fn stair<'a>(
     pages: &'a [TexturePage],
 ) -> Shape<'a> {
     Shape {
+        render_kind: Default::default(),
         kind: VisualKind::Model,
         faces: [0; 6],
         template: Some(0),
@@ -116,6 +117,36 @@ fn unsupported_materials_keep_the_thumbnail() {
     let mut shape = stair(&quads, &templates, &materials, &pages);
     shape.template = Some(4);
     assert!(shaped(&shape, &mut Atlas::new(7, 1)).is_none());
+}
+
+#[test]
+fn fence_meshes_keep_surface_order_for_both_fence_shapes() {
+    let materials = [material(0), material(0)];
+    let pages = [page()];
+    for (flags, render_kind) in [
+        (assets::MODEL_TEMPLATE_FLAG_FENCE_WOOD, Default::default()),
+        (assets::MODEL_TEMPLATE_FLAG_FENCE_NETHER, Default::default()),
+        (
+            assets::MODEL_TEMPLATE_FLAG_FENCE_WOOD,
+            assets::facts::BlockRenderKind::BambooFence,
+        ),
+    ] {
+        let templates = [ModelTemplate {
+            quad_start: 0,
+            quad_count: 0,
+            flags,
+        }];
+        let mut shape = stair(&[], &templates, &materials, &pages);
+        shape.render_kind = render_kind;
+        shape.faces = [1; 6];
+        let mesh = shaped(&shape, &mut Atlas::new(7, 1)).unwrap();
+        assert!(!mesh.batches().is_empty());
+        assert!(
+            mesh.batches()
+                .iter()
+                .all(|batch| !batch.depth_test && !batch.depth_write)
+        );
+    }
 }
 
 #[test]
